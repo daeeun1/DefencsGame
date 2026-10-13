@@ -33,6 +33,7 @@ export const COLORS = {
   text: '#fff8ec',
   textDark: '#3d2a1e',
   gold: '#ffd54f',
+  danger: '#ff6b6b',
 };
 
 export const FONT = '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';

@@ -29,7 +29,13 @@ src/
   main.js             게임 시작점: 화면 크기, 장면 목록
   config.js           크기, 배치, 색상 같은 공용 값
   ui.js               버튼 같은 공용 화면 부품
+  data/
+    balance.js        웨이브 길이, 체력 증가율 같은 밸런스 숫자
+    orders.js         주문(적) 종류와 능력치
+  objects/
+    Rail.js           회전 레일 경로 계산
+    Order.js          레일 위를 도는 주문 하나
   scenes/
     TitleScene.js     첫 화면 (제목, 시작 버튼)
-    GameScene.js      게임 화면 (정보 표시줄, 주방 판, 버튼)
+    GameScene.js      게임 화면 (웨이브 진행, 주문 이동, 승패 판정)
 ```
