@@ -3,7 +3,13 @@
 회전 레일 위를 도는 주문을 요리사들이 처리하는 **랜덤 타워 디펜스** 휴대폰 게임입니다.
 기획 내용은 [DESIGN.md](DESIGN.md)에 있습니다.
 
-## 실행하기
+## 바로 플레이하기
+
+https://daeeun1.github.io/DefencsGame/
+
+코드를 올릴 때마다 자동으로 새 버전이 배포됩니다. (`.github/workflows/deploy.yml`)
+
+## 내 컴퓨터에서 실행하기
 
 [Node.js](https://nodejs.org)가 설치되어 있어야 합니다.
 
