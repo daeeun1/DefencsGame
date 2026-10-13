@@ -22,8 +22,21 @@ export function orderMixForWave(wave) {
   if (wave <= 2) return { salad: 1 };
   if (wave <= 4) return { salad: 3, ramen: 1 };
   if (wave <= 6) return { salad: 3, ramen: 2, steak: 1 };
-  return { salad: 3, ramen: 2, steak: 2, bingsu: 2 };
+  if (wave <= 10) return { salad: 3, ramen: 2, steak: 2, bingsu: 2 };
+  if (wave <= 14) return { salad: 3, ramen: 2, steak: 2, bingsu: 2, bento: 1, rush: 1 };
+  return { salad: 3, ramen: 2, steak: 2, bingsu: 2, bento: 1, rush: 1, picky: 1 };
 }
+
+// ───────── VIP 손님 (보스) ─────────
+
+// 보스가 나오는 웨이브와 보스 종류
+export const BOSS_WAVES = { 10: 'critic', 20: 'chaebol', 30: 'king' };
+
+// 보스 웨이브의 제한 시간(인내심, 초). 이 안에 보스를 처리하지 못하면 패배
+export const BOSS_PATIENCE = 45;
+
+// 보스 웨이브에는 일반 주문도 섞여 나오는데, 평소보다 이 비율만큼만 나온다
+export const BOSS_WAVE_ORDER_RATIO = 0.5;
 
 // 해당 웨이브의 주문 체력
 export function orderHp(baseHp, wave) {

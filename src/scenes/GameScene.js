@@ -20,6 +20,9 @@ import {
   SPAWN_SPREAD,
   SUMMON_ODDS,
   MAX_MERGE_TIER,
+  BOSS_WAVES,
+  BOSS_PATIENCE,
+  BOSS_WAVE_ORDER_RATIO,
   UPGRADE_DAMAGE_PER_LEVEL,
   ordersInWave,
   orderMixForWave,
@@ -59,6 +62,8 @@ export default class GameScene extends Phaser.Scene {
     this.waveElapsed = 0;
     this.spawnQueue = []; // 이번 웨이브에 아직 안 나온 주문들 { at: 나올 시각(초), type }
     this.orders = [];
+    this.boss = null; // 지금 레일 위에 있는 VIP 손님
+    this.bossRushTimer = 0; // 재벌 3세 "빨리빨리!" 타이머
     this.chefs = [];
     this.projectiles = [];
     this.gold = START_GOLD;
@@ -102,6 +107,7 @@ export default class GameScene extends Phaser.Scene {
     while (this.spawnQueue.length > 0 && this.spawnQueue[0].at <= this.waveElapsed) {
       this.spawnOrder(this.spawnQueue.shift().type);
     }
+    if (this.boss) this.bossAbility(dt);
 
     // 3) 주문 이동 + 지속 피해
     for (const order of [...this.orders]) {
@@ -119,10 +125,12 @@ export default class GameScene extends Phaser.Scene {
     this.projectiles = this.projectiles.filter((p) => !p.done);
 
     // 5) 패배 / 다음 웨이브 / 클리어 판정
+    if (this.isOver) return; // 보스를 처치해서 이번 프레임에 클리어했을 수 있다
     if (this.orders.length >= RAIL_LIMIT) {
-      this.endGame(false);
+      this.endGame('rail');
     } else if (this.waveTimeLeft <= 0) {
-      if (this.wave >= TOTAL_WAVES) this.endGame(true);
+      if (this.boss) this.endGame('boss'); // 인내심이 다 떨어졌다
+      else if (this.wave >= TOTAL_WAVES) this.endGame('clear');
       else this.startWave(this.wave + 1);
     }
 
@@ -133,24 +141,60 @@ export default class GameScene extends Phaser.Scene {
 
   startWave(wave) {
     this.wave = wave;
-    this.waveTimeLeft = WAVE_DURATION;
     this.waveElapsed = 0;
+    const bossKey = BOSS_WAVES[wave];
 
     // 이번 웨이브에 나올 주문들을 미리 정해 두고, SPAWN_SPREAD초 동안 고르게 나눠서 내보낸다
-    const count = ordersInWave(wave);
+    let count = ordersInWave(wave);
+    if (bossKey) count = Math.round(count * BOSS_WAVE_ORDER_RATIO);
     const mix = orderMixForWave(wave);
     this.spawnQueue = [];
     for (let i = 0; i < count; i++) {
       this.spawnQueue.push({ at: (SPAWN_SPREAD * i) / count, type: pickWeighted(mix) });
     }
 
-    this.showBanner(`웨이브 ${wave}`);
+    if (bossKey) {
+      // 보스 웨이브: 제한 시간이 인내심으로 바뀌고, 보스가 맨 먼저 나온다
+      this.waveTimeLeft = BOSS_PATIENCE;
+      this.spawnQueue.unshift({ at: 0, type: bossKey });
+      this.showBanner(`⚠ VIP 손님 등장!\n${ORDER_TYPES[bossKey].emoji} ${ORDER_TYPES[bossKey].name}`, COLORS.danger, 44);
+    } else {
+      this.waveTimeLeft = WAVE_DURATION;
+      this.showBanner(`웨이브 ${wave}`);
+    }
   }
 
-  spawnOrder(typeKey) {
-    const order = new Order(this, this.rail, typeKey, this.wave);
+  // 주문을 레일에 올린다. startDistance: 레일 위 어디서 시작할지 (도시락이 나뉠 때 사용)
+  spawnOrder(typeKey, startDistance = 0) {
+    const order = new Order(this, this.rail, typeKey, this.wave, startDistance);
     this.orderLayer.add(order);
     this.orders.push(order);
+    if (this.boss) this.orderLayer.bringToTop(this.boss); // 보스는 항상 다른 주문 위에 보이게
+
+    if (order.isBoss) {
+      this.boss = order;
+      this.bossRushTimer = 0;
+      order.on('weaknessChanged', (method) => {
+        this.floatText(order.x, order.y - 70, `약점 변경! ${METHODS[method].emoji}`, COLORS.danger, 30);
+      });
+    }
+    return order;
+  }
+
+  // 보스의 특수 능력
+  bossAbility(dt) {
+    const rush = this.boss.type.rush;
+    if (!rush) return;
+    // 재벌 3세: 일정 시간마다 주변 주문을 빠르게 만든다
+    this.bossRushTimer += dt;
+    if (this.bossRushTimer < rush.every) return;
+    this.bossRushTimer = 0;
+    for (const order of this.orders) {
+      if (Phaser.Math.Distance.Between(this.boss.x, this.boss.y, order.x, order.y) <= rush.radius) {
+        order.applyHaste(rush.factor, rush.duration);
+      }
+    }
+    this.floatText(this.boss.x, this.boss.y - 70, '💸 빨리빨리!', COLORS.gold, 30);
   }
 
   damageOrder(order, amount) {
@@ -161,7 +205,15 @@ export default class GameScene extends Phaser.Scene {
   completeOrder(order) {
     this.gold += order.reward;
     this.orders = this.orders.filter((o) => o !== order);
-    this.floatText(order.x, order.y - 30, `+${order.reward}`, COLORS.gold);
+    if (order.reward > 0) this.floatText(order.x, order.y - 30, `+${order.reward}`, COLORS.gold);
+
+    // 단체 도시락: 그 자리에서 주먹밥 여러 개로 나뉜다
+    const split = order.type.splitInto;
+    if (split) {
+      for (let i = 0; i < split.count; i++) this.spawnOrder(split.type, order.distance - i * 30);
+    }
+
+    if (order === this.boss) this.bossDefeated(order);
 
     this.tweens.add({
       targets: order,
@@ -170,6 +222,17 @@ export default class GameScene extends Phaser.Scene {
       duration: 180,
       onComplete: () => order.destroy(),
     });
+  }
+
+  // VIP 손님을 처리했을 때: 마지막 보스면 클리어, 아니면 바로 다음 웨이브
+  bossDefeated(boss) {
+    this.boss = null;
+    this.showBanner(`🎉 ${boss.type.name} 만족!`, COLORS.gold, 44);
+    if (this.wave >= TOTAL_WAVES) {
+      this.endGame('clear');
+    } else {
+      this.waveTimeLeft = Math.min(this.waveTimeLeft, 1); // 1초 뒤 다음 웨이브
+    }
   }
 
   // ───────── 요리사 ─────────
@@ -236,7 +299,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     if (target.dead) return;
-    const bonus = target.type.weakness === stats.method ? WEAKNESS_MULTIPLIER : 1;
+    const bonus = this.weaknessMultiplier(stats, target);
     if (stats.dot) target.applyDot(stats.dot.dps * bonus * this.upgradeMultiplier(stats.tier), stats.dot.duration); // 끓이기
     if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration); // 차갑게
     this.damageOrder(target, this.damageAgainst(stats, target));
@@ -244,8 +307,14 @@ export default class GameScene extends Phaser.Scene {
 
   // 요리사가 이 주문에 주는 피해: 기본 공격력 × 강화 배율 × 약점이면 1.5배
   damageAgainst(stats, order) {
-    const bonus = order.type.weakness === stats.method ? WEAKNESS_MULTIPLIER : 1;
-    return stats.damage * this.upgradeMultiplier(stats.tier) * bonus;
+    return stats.damage * this.upgradeMultiplier(stats.tier) * this.weaknessMultiplier(stats, order);
+  }
+
+  // 약점이면 1.5배. 까다로운 주문은 약점이 아닌 조리법이면 절반.
+  weaknessMultiplier(stats, order) {
+    if (order.weakness === stats.method) return WEAKNESS_MULTIPLIER;
+    if (order.type.picky) return 0.5;
+    return 1;
   }
 
   // 등급별 강화로 올라간 공격력 배율 (Lv.3이면 1.6배)
@@ -413,7 +482,7 @@ export default class GameScene extends Phaser.Scene {
     this.rangeCircle.strokeCircle(chef.x, chef.y, s.range);
 
     const strongAgainst = Object.values(ORDER_TYPES)
-      .filter((o) => o.weakness === s.method)
+      .filter((o) => !o.boss && o.weakness === s.method)
       .map((o) => o.emoji + o.name)
       .join(', ');
     const detail =
@@ -425,7 +494,10 @@ export default class GameScene extends Phaser.Scene {
 
   // ───────── 게임 끝 ─────────
 
-  endGame(cleared) {
+  // reason: 'clear'(클리어) / 'rail'(주문이 너무 쌓임) / 'boss'(VIP 손님 인내심 초과)
+  endGame(reason) {
+    const cleared = reason === 'clear';
+    this.endReason = reason;
     this.isOver = true;
     this.upgradePanel.close();
     this.updateHud();
@@ -436,9 +508,12 @@ export default class GameScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_WIDTH, this.screenHeight, 0x000000, 0.7).setOrigin(0).setDepth(10);
 
     const title = cleared ? '🎉 영업 성공!' : '😵 가게가 망했어요...';
-    const detail = cleared
-      ? `${TOTAL_WAVES}웨이브를 모두 버텼어요`
-      : `${this.wave}웨이브에서 레일에 주문이 ${RAIL_LIMIT}개 쌓였어요`;
+    const details = {
+      clear: `${ORDER_TYPES.king.name}까지 만족시켰어요!`,
+      rail: `${this.wave}웨이브에서 레일에 주문이 ${RAIL_LIMIT}개 쌓였어요`,
+      boss: `${this.boss ? this.boss.type.name : 'VIP 손님'}이(가) 화가 나서 떠났어요`,
+    };
+    const detail = details[reason];
 
     this.add
       .text(centerX, centerY - 160, title, { fontFamily: FONT, fontSize: '60px', fontStyle: 'bold', color: COLORS.text })
@@ -472,9 +547,12 @@ export default class GameScene extends Phaser.Scene {
     const labels = ['웨이브', '남은 시간', '레일 주문', '골드'];
     const columnWidth = GAME_WIDTH / labels.length;
 
+    this.hudLabels = [];
     this.hudValues = labels.map((label, i) => {
       const x = columnWidth * i + columnWidth / 2;
-      this.add.text(x, 38, label, { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' }).setOrigin(0.5);
+      this.hudLabels.push(
+        this.add.text(x, 38, label, { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' }).setOrigin(0.5),
+      );
       return this.add
         .text(x, 78, '', { fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: COLORS.text })
         .setOrigin(0.5);
@@ -486,6 +564,9 @@ export default class GameScene extends Phaser.Scene {
     const [wave, time, orders, gold] = this.hudValues;
     wave.setText(`${this.wave} / ${TOTAL_WAVES}`);
     time.setText(`${Math.max(0, Math.ceil(this.waveTimeLeft))}`);
+    // 보스가 있으면 "남은 시간" 대신 "인내심"을 빨간색으로
+    this.hudLabels[1].setText(this.boss ? '😤 인내심' : '남은 시간');
+    time.setColor(this.boss ? COLORS.danger : COLORS.text);
     orders.setText(`${this.orders.length} / ${RAIL_LIMIT}`);
     orders.setColor(this.orders.length >= RAIL_WARNING ? COLORS.danger : COLORS.text);
     gold.setText(`${this.gold}`);
