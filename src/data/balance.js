@@ -47,3 +47,20 @@ export function summonCost(summonCount) {
 
 // 뽑기 등급 확률 (합이 100). 전설과 신화는 뽑기로 나오지 않는다.
 export const SUMMON_ODDS = { 1: 90, 2: 9, 3: 1 };
+
+// ───────── 합성 ─────────
+
+// 이 등급까지만 합성할 수 있다 (영웅 2개 → 전설). 전설 → 신화는 레시피로만.
+export const MAX_MERGE_TIER = 3;
+
+// ───────── 강화 ─────────
+
+// 강화 1번마다 해당 등급 요리사의 공격력 +20%
+export const UPGRADE_DAMAGE_PER_LEVEL = 0.2;
+
+// 강화 비용: 등급별 기본 비용 × (현재 레벨 + 1)
+export const UPGRADE_BASE_COST = { 1: 20, 2: 40, 3: 80, 4: 150 };
+
+export function upgradeCost(tier, level) {
+  return UPGRADE_BASE_COST[tier] * (level + 1);
+}

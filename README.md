@@ -38,7 +38,9 @@ src/
     Order.js          레일 위를 도는 주문 하나 (감속, 지속 피해 포함)
     Chef.js           칸에 서서 주문을 공격하는 요리사 하나
     Projectile.js     요리사가 던지는 칼, 불덩이, 국물, 얼음
+  panels/
+    UpgradePanel.js   등급별 강화 창
   scenes/
     TitleScene.js     첫 화면 (제목, 시작 버튼)
-    GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 승패 판정)
+    GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 합성, 강화, 승패 판정)
 ```

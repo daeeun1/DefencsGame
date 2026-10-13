@@ -19,9 +19,12 @@ import {
   START_GOLD,
   SPAWN_SPREAD,
   SUMMON_ODDS,
+  MAX_MERGE_TIER,
+  UPGRADE_DAMAGE_PER_LEVEL,
   ordersInWave,
   orderMixForWave,
   summonCost,
+  upgradeCost,
 } from '../data/balance.js';
 import { METHODS, TIERS, WEAKNESS_MULTIPLIER, chefsOfTier } from '../data/chefs.js';
 import { ORDER_TYPES } from '../data/orders.js';
@@ -30,6 +33,10 @@ import Rail from '../objects/Rail.js';
 import Order from '../objects/Order.js';
 import Chef from '../objects/Chef.js';
 import Projectile from '../objects/Projectile.js';
+import UpgradePanel from '../panels/UpgradePanel.js';
+
+// 손가락이 이만큼 움직여야 "끌기"로 본다 (그보다 적으면 "누르기")
+const DRAG_THRESHOLD = 12;
 
 // 요리사가 서는 안쪽 칸 수 (레일 한 줄을 뺀 나머지)
 const INNER_COLS = BOARD_COLS - 2;
@@ -56,7 +63,9 @@ export default class GameScene extends Phaser.Scene {
     this.projectiles = [];
     this.gold = START_GOLD;
     this.summonCount = 0; // 지금까지 뽑은 횟수 (뽑기 비용 계산용)
+    this.upgradeLevels = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }; // 등급별 강화 레벨
     this.selectedChef = null;
+    this.drag = null; // 끌고 있는 요리사 정보 { chef, startX, startY, moved }
     this.isOver = false;
 
     this.rail = new Rail(this.boardY);
@@ -67,7 +76,15 @@ export default class GameScene extends Phaser.Scene {
     this.createHud();
     this.createControls();
 
-    this.input.on('pointerdown', (pointer) => this.handleTap(pointer));
+    this.upgradePanel = new UpgradePanel(this, {
+      levels: this.upgradeLevels,
+      getGold: () => this.gold,
+      onUpgrade: (tier) => this.upgrade(tier),
+    });
+
+    this.input.on('pointerdown', (pointer) => this.onPointerDown(pointer));
+    this.input.on('pointermove', (pointer) => this.onPointerMove(pointer));
+    this.input.on('pointerup', (pointer) => this.onPointerUp(pointer));
 
     this.startWave(1);
   }
@@ -93,7 +110,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // 4) 요리사 공격, 투사체 이동
+    const dragging = this.drag && this.drag.moved ? this.drag.chef : null;
     for (const chef of this.chefs) {
+      if (chef === dragging) continue; // 끌려가는 중에는 공격하지 않는다
       chef.step(dt, this.orders, (c, target) => this.attack(c, target));
     }
     for (const p of this.projectiles) p.step(dt);
@@ -189,11 +208,7 @@ export default class GameScene extends Phaser.Scene {
     const data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
     const slot = Phaser.Utils.Array.GetRandom(empty);
 
-    const chef = new Chef(this, data, slot);
-    slot.chef = chef;
-    this.chefLayer.add(chef);
-    this.chefs.push(chef);
-    this.updateBuffs();
+    this.addChef(data, slot);
 
     this.floatText(slot.x, slot.y - 50, data.name, colorToHex(TIERS[tier].color), 24);
     if (tier >= 2) this.showBanner(`✨ ${TIERS[tier].name}! ${data.name}`, colorToHex(TIERS[tier].color), 44);
@@ -213,7 +228,7 @@ export default class GameScene extends Phaser.Scene {
       // 굽기: 닿은 곳 주변 주문 모두에게 피해
       for (const order of [...this.orders]) {
         if (Phaser.Math.Distance.Between(pos.x, pos.y, order.x, order.y) <= stats.splash) {
-          this.damageOrder(order, damageAgainst(stats, order));
+          this.damageOrder(order, this.damageAgainst(stats, order));
         }
       }
       this.explosion(pos.x, pos.y, stats.splash);
@@ -222,9 +237,29 @@ export default class GameScene extends Phaser.Scene {
 
     if (target.dead) return;
     const bonus = target.type.weakness === stats.method ? WEAKNESS_MULTIPLIER : 1;
-    if (stats.dot) target.applyDot(stats.dot.dps * bonus, stats.dot.duration); // 끓이기
+    if (stats.dot) target.applyDot(stats.dot.dps * bonus * this.upgradeMultiplier(stats.tier), stats.dot.duration); // 끓이기
     if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration); // 차갑게
-    this.damageOrder(target, damageAgainst(stats, target));
+    this.damageOrder(target, this.damageAgainst(stats, target));
+  }
+
+  // 요리사가 이 주문에 주는 피해: 기본 공격력 × 강화 배율 × 약점이면 1.5배
+  damageAgainst(stats, order) {
+    const bonus = order.type.weakness === stats.method ? WEAKNESS_MULTIPLIER : 1;
+    return stats.damage * this.upgradeMultiplier(stats.tier) * bonus;
+  }
+
+  // 등급별 강화로 올라간 공격력 배율 (Lv.3이면 1.6배)
+  upgradeMultiplier(tier) {
+    return 1 + this.upgradeLevels[tier] * UPGRADE_DAMAGE_PER_LEVEL;
+  }
+
+  upgrade(tier) {
+    const cost = upgradeCost(tier, this.upgradeLevels[tier]);
+    if (this.isOver || this.gold < cost) return;
+    this.gold -= cost;
+    this.upgradeLevels[tier] += 1;
+    if (this.selectedChef) this.selectChef(this.selectedChef); // 정보창의 공격력 숫자 갱신
+    this.updateHud();
   }
 
   // 총괄 주방장 주변(대각선 포함 바로 옆 칸) 요리사의 공격 속도를 올린다
@@ -241,14 +276,124 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // 화면을 눌렀을 때: 요리사가 있는 칸이면 선택, 아니면 선택 해제
-  handleTap(pointer) {
+  // ───────── 누르기와 끌기 ─────────
+  // 요리사를 짧게 누르면 선택, 끌어서 놓으면 이동 / 자리 바꾸기 / 합성
+
+  slotAt(x, y) {
+    return this.slots.find((s) => Math.abs(x - s.x) <= TILE / 2 && Math.abs(y - s.y) <= TILE / 2);
+  }
+
+  onPointerDown(pointer) {
+    if (this.isOver || this.upgradePanel.isOpen) return;
+    const slot = this.slotAt(pointer.worldX, pointer.worldY);
+    if (slot && slot.chef) {
+      this.drag = { chef: slot.chef, startX: pointer.worldX, startY: pointer.worldY, moved: false };
+    } else if (pointer.worldY < this.screenHeight - CONTROLS_HEIGHT) {
+      this.selectChef(null); // 빈 곳을 누르면 선택 해제
+    }
+  }
+
+  onPointerMove(pointer) {
+    const drag = this.drag;
+    if (!drag || this.isOver) return;
+
+    if (!drag.moved) {
+      const d = Phaser.Math.Distance.Between(drag.startX, drag.startY, pointer.worldX, pointer.worldY);
+      if (d < DRAG_THRESHOLD) return;
+      drag.moved = true;
+      this.selectChef(null);
+      drag.chef.setDepth(1);
+      this.chefLayer.bringToTop(drag.chef);
+      this.showMergeTargets(drag.chef);
+    }
+    drag.chef.setPosition(pointer.worldX, pointer.worldY);
+  }
+
+  onPointerUp(pointer) {
+    const drag = this.drag;
+    if (!drag) return;
+    this.drag = null;
+    this.mergeHints.clear();
+
     if (this.isOver) return;
-    const slot = this.slots.find(
-      (s) => Math.abs(pointer.worldX - s.x) <= TILE / 2 && Math.abs(pointer.worldY - s.y) <= TILE / 2,
-    );
-    if (slot && slot.chef) this.selectChef(slot.chef);
-    else if (pointer.worldY < this.screenHeight - CONTROLS_HEIGHT) this.selectChef(null);
+    if (!drag.moved) {
+      this.selectChef(drag.chef); // 그냥 누른 것: 선택
+      return;
+    }
+
+    const chef = drag.chef;
+    const target = this.slotAt(pointer.worldX, pointer.worldY);
+    if (!target || target === chef.slot) {
+      this.placeChef(chef, chef.slot); // 판 밖이나 제자리: 원래 칸으로 돌아간다
+    } else if (!target.chef) {
+      this.placeChef(chef, target); // 빈 칸: 이동
+    } else if (this.canMerge(chef, target.chef)) {
+      this.merge(chef, target.chef); // 같은 요리사: 합성
+    } else {
+      // 다른 요리사: 자리 바꾸기
+      const other = target.chef;
+      const from = chef.slot;
+      this.placeChef(other, from);
+      this.placeChef(chef, target);
+    }
+    this.updateBuffs();
+  }
+
+  // 요리사를 칸에 놓는다 (부드럽게 미끄러지며 이동)
+  placeChef(chef, slot) {
+    if (chef.slot.chef === chef) chef.slot.chef = null;
+    chef.slot = slot;
+    slot.chef = chef;
+    chef.setDepth(0);
+    this.tweens.add({ targets: chef, x: slot.x, y: slot.y, duration: 120, ease: 'Quad.Out' });
+  }
+
+  // 같은 요리사이고, 합성할 수 있는 등급이면 합성 가능
+  canMerge(a, b) {
+    return a !== b && a.stats.id === b.stats.id && a.stats.tier <= MAX_MERGE_TIER;
+  }
+
+  // 끄는 동안 합성할 수 있는 칸을 초록색으로 표시
+  showMergeTargets(chef) {
+    this.mergeHints.clear();
+    this.mergeHints.lineStyle(6, 0x6ddc6d, 1);
+    for (const other of this.chefs) {
+      if (this.canMerge(chef, other)) {
+        this.mergeHints.strokeRoundedRect(other.slot.x - TILE / 2 + 4, other.slot.y - TILE / 2 + 4, TILE - 8, TILE - 8, 12);
+      }
+    }
+  }
+
+  // 합성: 두 요리사가 사라지고, 놓은 칸에 한 등급 위 무작위 요리사가 생긴다
+  merge(dragged, target) {
+    const slot = target.slot;
+    const tier = target.stats.tier + 1;
+    this.removeChef(dragged);
+    this.removeChef(target);
+
+    const data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
+    this.addChef(data, slot);
+
+    const color = colorToHex(TIERS[tier].color);
+    this.floatText(slot.x, slot.y - 50, data.name, color, 24);
+    if (tier >= 3) this.showBanner(`🔀 ${TIERS[tier].name}! ${data.name}`, color, 44);
+    this.updateHud();
+  }
+
+  addChef(data, slot) {
+    const chef = new Chef(this, data, slot);
+    slot.chef = chef;
+    this.chefLayer.add(chef);
+    this.chefs.push(chef);
+    this.updateBuffs();
+    return chef;
+  }
+
+  removeChef(chef) {
+    if (chef.slot.chef === chef) chef.slot.chef = null;
+    this.chefs = this.chefs.filter((c) => c !== chef);
+    if (this.selectedChef === chef) this.selectChef(null);
+    chef.destroy();
   }
 
   selectChef(chef) {
@@ -256,7 +401,7 @@ export default class GameScene extends Phaser.Scene {
     this.rangeCircle.clear();
 
     if (!chef) {
-      this.infoText.setText('요리사를 누르면 정보가 보여요');
+      this.infoText.setText('요리사를 누르면 정보가 보여요\n같은 요리사끼리 끌어다 놓으면 합성!');
       return;
     }
 
@@ -274,7 +419,7 @@ export default class GameScene extends Phaser.Scene {
     const detail =
       s.method === 'buff'
         ? `주변 요리사 공격 속도 +${Math.round(s.buff.attackSpeed * 100)}%`
-        : `공격력 ${s.damage} · ${method.role}${strongAgainst ? ` · ${strongAgainst}에 강함` : ''}`;
+        : `공격력 ${Math.round(s.damage * this.upgradeMultiplier(s.tier))} · ${method.role}${strongAgainst ? ` · ${strongAgainst}에 강함` : ''}`;
     this.infoText.setText(`[${TIERS[s.tier].name}] ${method.emoji} ${s.name}\n${detail}`);
   }
 
@@ -282,6 +427,7 @@ export default class GameScene extends Phaser.Scene {
 
   endGame(cleared) {
     this.isOver = true;
+    this.upgradePanel.close();
     this.updateHud();
 
     const centerX = GAME_WIDTH / 2;
@@ -312,6 +458,7 @@ export default class GameScene extends Phaser.Scene {
   // 그리는 순서(아래 → 위): 판 → 사거리 표시 → 요리사 → 주문 → 투사체 → 효과
   createLayers() {
     this.rangeCircle = this.add.graphics();
+    this.mergeHints = this.add.graphics();
     this.chefLayer = this.add.layer();
     this.orderLayer = this.add.layer();
     this.projectileLayer = this.add.layer();
@@ -347,6 +494,8 @@ export default class GameScene extends Phaser.Scene {
     const full = this.emptySlots().length === 0;
     this.summonButton.setLabel(full ? '🎲 자리가 없어요' : `🎲 요리사 뽑기\n${cost}골드`);
     this.summonButton.setEnabled(!this.isOver && !full && this.gold >= cost);
+
+    if (this.upgradePanel.isOpen) this.upgradePanel.refresh();
   }
 
   // 주방 판: 바깥 한 줄은 회전 레일, 안쪽은 요리사 자리(체크무늬)
@@ -414,7 +563,7 @@ export default class GameScene extends Phaser.Scene {
   createControls() {
     const y = this.screenHeight - CONTROLS_HEIGHT / 2;
     this.summonButton = createButton(this, 250, y, 380, 120, '', () => this.summon(), { fontSize: 30 });
-    createButton(this, 560, y, 220, 120, '⬆ 강화', () => {}, { enabled: false });
+    createButton(this, 560, y, 220, 120, '⬆ 강화', () => this.upgradePanel.open());
 
     this.infoText = this.add
       .text(GAME_WIDTH / 2, y - 105, '', {
@@ -473,12 +622,6 @@ export default class GameScene extends Phaser.Scene {
     circle.setScale(0.3);
     this.tweens.add({ targets: circle, scale: 1, alpha: 0, duration: 250, onComplete: () => circle.destroy() });
   }
-}
-
-// 요리사가 이 주문에 주는 피해. 약점 조리법이면 1.5배.
-function damageAgainst(stats, order) {
-  const bonus = order.type.weakness === stats.method ? WEAKNESS_MULTIPLIER : 1;
-  return stats.damage * bonus;
 }
 
 // { salad: 3, ramen: 1 } 같은 비율표에서 하나를 무작위로 고른다
