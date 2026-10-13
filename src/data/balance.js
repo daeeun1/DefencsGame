@@ -30,5 +30,20 @@ export function orderHp(baseHp, wave) {
   return Math.round(baseHp * HP_GROWTH ** (wave - 1));
 }
 
-// 임시: 주문을 손가락으로 탭했을 때 주는 피해 (3단계에서 요리사가 생기면 삭제)
-export const TAP_DAMAGE = 12;
+// 주문을 처리했을 때 받는 골드: 기본 보상 + 5웨이브마다 1씩 추가
+export function orderReward(baseReward, wave) {
+  return baseReward + Math.floor((wave - 1) / 5);
+}
+
+// ───────── 요리사 뽑기 ─────────
+
+// 뽑기 비용: 처음 20골드, 뽑을 때마다 2골드씩 오른다
+export const SUMMON_BASE_COST = 20;
+export const SUMMON_COST_STEP = 2;
+
+export function summonCost(summonCount) {
+  return SUMMON_BASE_COST + SUMMON_COST_STEP * summonCount;
+}
+
+// 뽑기 등급 확률 (합이 100). 전설과 신화는 뽑기로 나오지 않는다.
+export const SUMMON_ODDS = { 1: 90, 2: 9, 3: 1 };

@@ -18,17 +18,25 @@ import {
   RAIL_WARNING,
   START_GOLD,
   SPAWN_SPREAD,
-  TAP_DAMAGE,
+  SUMMON_ODDS,
   ordersInWave,
   orderMixForWave,
+  summonCost,
 } from '../data/balance.js';
+import { METHODS, TIERS, WEAKNESS_MULTIPLIER, chefsOfTier } from '../data/chefs.js';
+import { ORDER_TYPES } from '../data/orders.js';
 import { createButton } from '../ui.js';
 import Rail from '../objects/Rail.js';
 import Order from '../objects/Order.js';
+import Chef from '../objects/Chef.js';
+import Projectile from '../objects/Projectile.js';
+
+// 요리사가 서는 안쪽 칸 수 (레일 한 줄을 뺀 나머지)
+const INNER_COLS = BOARD_COLS - 2;
+const INNER_ROWS = BOARD_ROWS - 2;
 
 // 실제 게임이 진행되는 장면.
-// 2단계: 주문이 레일을 돌고, 웨이브가 진행되고, 주문이 너무 쌓이면 패배한다.
-// 요리사는 3단계에서 붙인다. 그 전까지는 주문을 손가락으로 탭해서 처리할 수 있다(임시).
+// 주문이 레일을 돌고, 요리사를 뽑아 주문을 처리하고, 주문이 너무 쌓이면 패배한다.
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super('Game');
@@ -44,14 +52,20 @@ export default class GameScene extends Phaser.Scene {
     this.waveElapsed = 0;
     this.spawnQueue = []; // 이번 웨이브에 아직 안 나온 주문들 { at: 나올 시각(초), type }
     this.orders = [];
+    this.chefs = [];
+    this.projectiles = [];
     this.gold = START_GOLD;
+    this.summonCount = 0; // 지금까지 뽑은 횟수 (뽑기 비용 계산용)
+    this.selectedChef = null;
     this.isOver = false;
 
     this.rail = new Rail(this.boardY);
+    this.slots = this.createSlots();
 
     this.drawBoard();
+    this.createLayers();
     this.createHud();
-    this.drawControls();
+    this.createControls();
 
     this.input.on('pointerdown', (pointer) => this.handleTap(pointer));
 
@@ -61,7 +75,7 @@ export default class GameScene extends Phaser.Scene {
   // 매 프레임 실행된다. delta는 지난 프레임부터 흐른 시간(밀리초).
   update(time, delta) {
     if (this.isOver) return;
-    const dt = delta / 1000;
+    const dt = Math.min(delta, 100) / 1000; // 탭 전환 등으로 시간이 크게 튀는 것 방지
 
     // 1) 웨이브 시간 진행
     this.waveTimeLeft -= dt;
@@ -72,10 +86,20 @@ export default class GameScene extends Phaser.Scene {
       this.spawnOrder(this.spawnQueue.shift().type);
     }
 
-    // 3) 모든 주문을 앞으로 이동
-    for (const order of this.orders) order.step(dt);
+    // 3) 주문 이동 + 지속 피해
+    for (const order of [...this.orders]) {
+      const dotDamage = order.step(dt);
+      if (dotDamage > 0) this.damageOrder(order, dotDamage);
+    }
 
-    // 4) 패배 / 다음 웨이브 / 클리어 판정
+    // 4) 요리사 공격, 투사체 이동
+    for (const chef of this.chefs) {
+      chef.step(dt, this.orders, (c, target) => this.attack(c, target));
+    }
+    for (const p of this.projectiles) p.step(dt);
+    this.projectiles = this.projectiles.filter((p) => !p.done);
+
+    // 5) 패배 / 다음 웨이브 / 클리어 판정
     if (this.orders.length >= RAIL_LIMIT) {
       this.endGame(false);
     } else if (this.waveTimeLeft <= 0) {
@@ -110,11 +134,15 @@ export default class GameScene extends Phaser.Scene {
     this.orders.push(order);
   }
 
+  damageOrder(order, amount) {
+    if (order.takeDamage(amount)) this.completeOrder(order);
+  }
+
   // 주문을 처리했을 때: 골드를 받고 레일에서 사라진다
   completeOrder(order) {
-    this.gold += order.type.reward;
+    this.gold += order.reward;
     this.orders = this.orders.filter((o) => o !== order);
-    this.floatText(order.x, order.y - 30, `+${order.type.reward}`, COLORS.gold);
+    this.floatText(order.x, order.y - 30, `+${order.reward}`, COLORS.gold);
 
     this.tweens.add({
       targets: order,
@@ -125,20 +153,129 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // 임시: 손가락으로 탭한 곳에서 가장 가까운 주문에 피해를 준다.
-  // 정확히 누르지 않아도 되게 반경 60 안이면 맞은 것으로 친다.
-  handleTap(pointer) {
-    if (this.isOver) return;
-    let target = null;
-    let best = 60;
-    for (const order of this.orders) {
-      const d = Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, order.x, order.y);
-      if (d < best) {
-        best = d;
-        target = order;
+  // ───────── 요리사 ─────────
+
+  // 요리사가 설 수 있는 칸 목록 (안쪽 4 x 7칸)
+  createSlots() {
+    const slots = [];
+    for (let row = 0; row < INNER_ROWS; row++) {
+      for (let col = 0; col < INNER_COLS; col++) {
+        slots.push({
+          col,
+          row,
+          x: BOARD_X + (col + 1.5) * TILE,
+          y: this.boardY + (row + 1.5) * TILE,
+          chef: null,
+        });
       }
     }
-    if (target && target.takeDamage(TAP_DAMAGE)) this.completeOrder(target);
+    return slots;
+  }
+
+  emptySlots() {
+    return this.slots.filter((s) => !s.chef);
+  }
+
+  // 요리사 뽑기: 골드를 내고 무작위 등급, 무작위 요리사를 빈 칸에 놓는다
+  summon() {
+    const cost = summonCost(this.summonCount);
+    const empty = this.emptySlots();
+    if (this.isOver || this.gold < cost || empty.length === 0) return;
+
+    this.gold -= cost;
+    this.summonCount += 1;
+
+    const tier = Number(pickWeighted(SUMMON_ODDS));
+    const data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
+    const slot = Phaser.Utils.Array.GetRandom(empty);
+
+    const chef = new Chef(this, data, slot);
+    slot.chef = chef;
+    this.chefLayer.add(chef);
+    this.chefs.push(chef);
+    this.updateBuffs();
+
+    this.floatText(slot.x, slot.y - 50, data.name, colorToHex(TIERS[tier].color), 24);
+    if (tier >= 2) this.showBanner(`✨ ${TIERS[tier].name}! ${data.name}`, colorToHex(TIERS[tier].color), 44);
+    this.updateHud();
+  }
+
+  // 요리사가 공격: 목표를 향해 투사체를 날린다
+  attack(chef, target) {
+    const projectile = new Projectile(this, chef, target, (pos) => this.resolveHit(chef.stats, target, pos));
+    this.projectileLayer.add(projectile);
+    this.projectiles.push(projectile);
+  }
+
+  // 투사체가 닿았을 때 조리법에 맞는 효과를 준다
+  resolveHit(stats, target, pos) {
+    if (stats.splash) {
+      // 굽기: 닿은 곳 주변 주문 모두에게 피해
+      for (const order of [...this.orders]) {
+        if (Phaser.Math.Distance.Between(pos.x, pos.y, order.x, order.y) <= stats.splash) {
+          this.damageOrder(order, damageAgainst(stats, order));
+        }
+      }
+      this.explosion(pos.x, pos.y, stats.splash);
+      return;
+    }
+
+    if (target.dead) return;
+    const bonus = target.type.weakness === stats.method ? WEAKNESS_MULTIPLIER : 1;
+    if (stats.dot) target.applyDot(stats.dot.dps * bonus, stats.dot.duration); // 끓이기
+    if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration); // 차갑게
+    this.damageOrder(target, damageAgainst(stats, target));
+  }
+
+  // 총괄 주방장 주변(대각선 포함 바로 옆 칸) 요리사의 공격 속도를 올린다
+  updateBuffs() {
+    for (const chef of this.chefs) {
+      let bonus = 0;
+      for (const other of this.chefs) {
+        const buff = other.stats.buff;
+        if (!buff || other === chef) continue;
+        const near = Math.abs(other.slot.col - chef.slot.col) <= 1 && Math.abs(other.slot.row - chef.slot.row) <= 1;
+        if (near) bonus = Math.max(bonus, buff.attackSpeed);
+      }
+      chef.attackSpeed = 1 + bonus;
+    }
+  }
+
+  // 화면을 눌렀을 때: 요리사가 있는 칸이면 선택, 아니면 선택 해제
+  handleTap(pointer) {
+    if (this.isOver) return;
+    const slot = this.slots.find(
+      (s) => Math.abs(pointer.worldX - s.x) <= TILE / 2 && Math.abs(pointer.worldY - s.y) <= TILE / 2,
+    );
+    if (slot && slot.chef) this.selectChef(slot.chef);
+    else if (pointer.worldY < this.screenHeight - CONTROLS_HEIGHT) this.selectChef(null);
+  }
+
+  selectChef(chef) {
+    this.selectedChef = chef;
+    this.rangeCircle.clear();
+
+    if (!chef) {
+      this.infoText.setText('요리사를 누르면 정보가 보여요');
+      return;
+    }
+
+    const s = chef.stats;
+    const method = METHODS[s.method];
+    this.rangeCircle.fillStyle(0xffffff, 0.15);
+    this.rangeCircle.lineStyle(3, 0xffffff, 0.6);
+    this.rangeCircle.fillCircle(chef.x, chef.y, s.range);
+    this.rangeCircle.strokeCircle(chef.x, chef.y, s.range);
+
+    const strongAgainst = Object.values(ORDER_TYPES)
+      .filter((o) => o.weakness === s.method)
+      .map((o) => o.emoji + o.name)
+      .join(', ');
+    const detail =
+      s.method === 'buff'
+        ? `주변 요리사 공격 속도 +${Math.round(s.buff.attackSpeed * 100)}%`
+        : `공격력 ${s.damage} · ${method.role}${strongAgainst ? ` · ${strongAgainst}에 강함` : ''}`;
+    this.infoText.setText(`[${TIERS[s.tier].name}] ${method.emoji} ${s.name}\n${detail}`);
   }
 
   // ───────── 게임 끝 ─────────
@@ -172,6 +309,15 @@ export default class GameScene extends Phaser.Scene {
 
   // ───────── 화면 그리기 ─────────
 
+  // 그리는 순서(아래 → 위): 판 → 사거리 표시 → 요리사 → 주문 → 투사체 → 효과
+  createLayers() {
+    this.rangeCircle = this.add.graphics();
+    this.chefLayer = this.add.layer();
+    this.orderLayer = this.add.layer();
+    this.projectileLayer = this.add.layer();
+    this.effectLayer = this.add.layer();
+  }
+
   // 화면 위쪽 정보 표시줄: 웨이브, 남은 시간, 레일 위 주문 수, 골드
   createHud() {
     this.add.rectangle(0, 0, GAME_WIDTH, HUD_HEIGHT, COLORS.hud).setOrigin(0);
@@ -187,7 +333,6 @@ export default class GameScene extends Phaser.Scene {
         .setOrigin(0.5);
     });
     this.hudValues[3].setColor(COLORS.gold);
-    this.updateHud();
   }
 
   updateHud() {
@@ -197,6 +342,11 @@ export default class GameScene extends Phaser.Scene {
     orders.setText(`${this.orders.length} / ${RAIL_LIMIT}`);
     orders.setColor(this.orders.length >= RAIL_WARNING ? COLORS.danger : COLORS.text);
     gold.setText(`${this.gold}`);
+
+    const cost = summonCost(this.summonCount);
+    const full = this.emptySlots().length === 0;
+    this.summonButton.setLabel(full ? '🎲 자리가 없어요' : `🎲 요리사 뽑기\n${cost}골드`);
+    this.summonButton.setEnabled(!this.isOver && !full && this.gold >= cost);
   }
 
   // 주방 판: 바깥 한 줄은 회전 레일, 안쪽은 요리사 자리(체크무늬)
@@ -225,9 +375,6 @@ export default class GameScene extends Phaser.Scene {
     // 판 테두리
     g.lineStyle(6, 0x1c120c, 1);
     g.strokeRect(BOARD_X, this.boardY, BOARD_COLS * TILE, BOARD_ROWS * TILE);
-
-    // 주문은 판 위, 안내 문구보다 아래에 그린다
-    this.orderLayer = this.add.layer();
   }
 
   // 판의 가장 바깥 줄이면 레일
@@ -263,15 +410,22 @@ export default class GameScene extends Phaser.Scene {
     g.strokePath();
   }
 
-  // 화면 아래 버튼들. 지금은 모양만 있고, 3~4단계에서 기능을 연결한다.
-  drawControls() {
+  // 화면 아래: 선택한 요리사 정보, 뽑기 버튼, 강화 버튼
+  createControls() {
     const y = this.screenHeight - CONTROLS_HEIGHT / 2;
-    createButton(this, 250, y, 380, 120, '🎲 요리사 뽑기', () => {}, { enabled: false });
+    this.summonButton = createButton(this, 250, y, 380, 120, '', () => this.summon(), { fontSize: 30 });
     createButton(this, 560, y, 220, 120, '⬆ 강화', () => {}, { enabled: false });
 
-    this.add
-      .text(GAME_WIDTH / 2, y - 90, '(임시) 주문을 탭하면 처리돼요', { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' })
+    this.infoText = this.add
+      .text(GAME_WIDTH / 2, y - 105, '', {
+        fontFamily: FONT,
+        fontSize: '22px',
+        color: COLORS.text,
+        align: 'center',
+        lineSpacing: 6,
+      })
       .setOrigin(0.5);
+    this.selectChef(null);
 
     // 정보 표시줄 바로 아래 작은 버튼: 첫 화면으로 돌아가기
     const back = this.add
@@ -281,13 +435,15 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // 판 가운데에 잠깐 나타났다 사라지는 큰 글씨 (예: "웨이브 3")
-  showBanner(message) {
+  showBanner(message, color = COLORS.textDark, fontSize = 64) {
     const text = this.add
       .text(GAME_WIDTH / 2, this.boardY + (BOARD_ROWS * TILE) / 2, message, {
         fontFamily: FONT,
-        fontSize: '64px',
+        fontSize: `${fontSize}px`,
         fontStyle: 'bold',
-        color: COLORS.textDark,
+        color,
+        stroke: '#3d2a1e',
+        strokeThickness: color === COLORS.textDark ? 0 : 6,
       })
       .setOrigin(0.5)
       .setDepth(5);
@@ -295,13 +451,34 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // 위로 떠오르며 사라지는 작은 글씨 (예: 골드 "+2")
-  floatText(x, y, message, color) {
+  floatText(x, y, message, color, fontSize = 28) {
     const text = this.add
-      .text(x, y, message, { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color })
-      .setOrigin(0.5)
-      .setDepth(6);
+      .text(x, y, message, {
+        fontFamily: FONT,
+        fontSize: `${fontSize}px`,
+        fontStyle: 'bold',
+        color,
+        stroke: '#3d2a1e',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5);
+    this.effectLayer.add(text);
     this.tweens.add({ targets: text, y: y - 50, alpha: 0, duration: 700, onComplete: () => text.destroy() });
   }
+
+  // 굽기 공격이 터지는 효과
+  explosion(x, y, radius) {
+    const circle = this.add.circle(x, y, radius, 0xff7a1a, 0.35);
+    this.effectLayer.add(circle);
+    circle.setScale(0.3);
+    this.tweens.add({ targets: circle, scale: 1, alpha: 0, duration: 250, onComplete: () => circle.destroy() });
+  }
+}
+
+// 요리사가 이 주문에 주는 피해. 약점 조리법이면 1.5배.
+function damageAgainst(stats, order) {
+  const bonus = order.type.weakness === stats.method ? WEAKNESS_MULTIPLIER : 1;
+  return stats.damage * bonus;
 }
 
 // { salad: 3, ramen: 1 } 같은 비율표에서 하나를 무작위로 고른다
@@ -314,4 +491,9 @@ function pickWeighted(weights) {
     if (r < 0) return key;
   }
   return entries[entries.length - 1][0];
+}
+
+// 0xff8800 같은 숫자 색을 '#ff8800' 글자 색으로 바꾼다
+function colorToHex(color) {
+  return `#${color.toString(16).padStart(6, '0')}`;
 }

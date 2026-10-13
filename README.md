@@ -32,10 +32,13 @@ src/
   data/
     balance.js        웨이브 길이, 체력 증가율 같은 밸런스 숫자
     orders.js         주문(적) 종류와 능력치
+    chefs.js          요리사 목록, 등급, 조리법별 능력치
   objects/
     Rail.js           회전 레일 경로 계산
-    Order.js          레일 위를 도는 주문 하나
+    Order.js          레일 위를 도는 주문 하나 (감속, 지속 피해 포함)
+    Chef.js           칸에 서서 주문을 공격하는 요리사 하나
+    Projectile.js     요리사가 던지는 칼, 불덩이, 국물, 얼음
   scenes/
     TitleScene.js     첫 화면 (제목, 시작 버튼)
-    GameScene.js      게임 화면 (웨이브 진행, 주문 이동, 승패 판정)
+    GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 승패 판정)
 ```
