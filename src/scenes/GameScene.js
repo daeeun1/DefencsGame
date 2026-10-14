@@ -38,6 +38,9 @@ import Chef from '../objects/Chef.js';
 import Projectile from '../objects/Projectile.js';
 import UpgradePanel from '../panels/UpgradePanel.js';
 
+// 배속 버튼을 누를 때마다 이 순서로 바뀐다
+const SPEEDS = [1, 2, 3];
+
 // 손가락이 이만큼 움직여야 "끌기"로 본다 (그보다 적으면 "누르기")
 const DRAG_THRESHOLD = 12;
 
@@ -72,6 +75,7 @@ export default class GameScene extends Phaser.Scene {
     this.selectedChef = null;
     this.drag = null; // 끌고 있는 요리사 정보 { chef, startX, startY, moved }
     this.isOver = false;
+    this.gameSpeed = this.registry.get('gameSpeed') ?? 1; // 다시 하기를 눌러도 배속 유지
 
     this.rail = new Rail(this.boardY);
     this.slots = this.createSlots();
@@ -95,10 +99,15 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // 매 프레임 실행된다. delta는 지난 프레임부터 흐른 시간(밀리초).
+  // 배속이면 한 프레임에 게임 시간을 여러 번 진행한다 (2배속이면 2번)
   update(time, delta) {
-    if (this.isOver) return;
     const dt = Math.min(delta, 100) / 1000; // 탭 전환 등으로 시간이 크게 튀는 것 방지
+    for (let i = 0; i < this.gameSpeed && !this.isOver; i++) this.tick(dt);
+    this.updateHud();
+  }
 
+  // 게임 시간을 dt초만큼 진행한다
+  tick(dt) {
     // 1) 웨이브 시간 진행
     this.waveTimeLeft -= dt;
     this.waveElapsed += dt;
@@ -133,8 +142,6 @@ export default class GameScene extends Phaser.Scene {
       else if (this.wave >= TOTAL_WAVES) this.endGame('clear');
       else this.startWave(this.wave + 1);
     }
-
-    this.updateHud();
   }
 
   // ───────── 웨이브와 주문 ─────────
@@ -643,8 +650,10 @@ export default class GameScene extends Phaser.Scene {
   // 화면 아래: 선택한 요리사 정보, 뽑기 버튼, 강화 버튼
   createControls() {
     const y = this.screenHeight - CONTROLS_HEIGHT / 2;
-    this.summonButton = createButton(this, 250, y, 380, 120, '', () => this.summon(), { fontSize: 30 });
-    createButton(this, 560, y, 220, 120, '⬆ 강화', () => this.upgradePanel.open());
+    this.summonButton = createButton(this, 200, y, 340, 120, '', () => this.summon(), { fontSize: 30 });
+    createButton(this, 470, y, 170, 120, '⬆ 강화', () => this.upgradePanel.open(), { fontSize: 30 });
+    this.speedButton = createButton(this, 635, y, 130, 120, '', () => this.toggleSpeed(), { fontSize: 26 });
+    this.updateSpeedButton();
 
     this.infoText = this.add
       .text(GAME_WIDTH / 2, y - 105, '', {
@@ -662,6 +671,18 @@ export default class GameScene extends Phaser.Scene {
       .text(BOARD_X, HUD_HEIGHT + 4, '← 처음으로', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' })
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
+  }
+
+  // 배속 바꾸기: 1 → 2 → 3 → 1
+  toggleSpeed() {
+    const next = SPEEDS[(SPEEDS.indexOf(this.gameSpeed) + 1) % SPEEDS.length];
+    this.gameSpeed = next;
+    this.registry.set('gameSpeed', next);
+    this.updateSpeedButton();
+  }
+
+  updateSpeedButton() {
+    this.speedButton.setLabel(`⏩\n${this.gameSpeed}배속`);
   }
 
   // 판 가운데에 잠깐 나타났다 사라지는 큰 글씨 (예: "웨이브 3")
