@@ -30,6 +30,8 @@ src/
   config.js           크기, 배치, 색상 같은 공용 값
   ui.js               버튼 같은 공용 화면 부품
   save.js             영구 성장 기록 저장 (팁, 별, 강화, 도감)
+  cloud.js            ☁️ 클라우드 저장 (Firebase 익명 로그인 + 구글 계정 연결)
+  firebase-config.js  Firebase 프로젝트 연결 정보 (공개용 값)
   effects.js          연출 (파티클, 빛 기둥, 화면 흔들림, 진동, 꽃가루)
   audio.js            효과음과 배경음악 (파일 없이 코드로 합성)
   eastereggs.js       🥚 이스터 에그 목록, 특별한 날 판별, 대사
