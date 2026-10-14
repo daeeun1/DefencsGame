@@ -8,6 +8,7 @@ const LOOKS = {
   grill: { color: 0xff7a1a, radius: 12 }, // 불덩이
   boil: { color: 0xc9884a, radius: 10 }, // 끓는 국물
   chill: { color: 0x9fd8ff, radius: 9 }, // 얼음
+  all: { color: 0xffd54f, radius: 13 }, // 요리의 신: 황금빛
 };
 
 // 요리사가 주문을 향해 날리는 투사체.

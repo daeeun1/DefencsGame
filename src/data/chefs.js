@@ -51,6 +51,18 @@ export const METHODS = {
     range: 230,
     slow: { factor: 0.6, duration: 1.5 }, // 1.5초 동안 속도가 60%로 느려진다
   },
+  // 요리의 신 전용: 상대의 약점 조리법을 골라 공격하고, 범위·지속 피해·감속을 모두 준다
+  all: {
+    name: '모든 조리법',
+    emoji: '🌟',
+    role: '항상 약점 공격 + 범위·지속 피해·감속',
+    damage: 10,
+    interval: 0.5,
+    range: 270,
+    splash: 80,
+    dot: { dps: 6, duration: 3 },
+    slow: { factor: 0.6, duration: 1.5 },
+  },
   buff: {
     name: '지휘',
     emoji: '📣',
@@ -86,7 +98,26 @@ export const CHEFS = [
   chef('sushi_legend', '전설의 스시 장인', 4, 'cut', { interval: 0.4, range: 260 }),
   chef('hellfire_grill', '지옥불 그릴 마스터', 4, 'grill', { splash: 100 }),
   chef('head_chef', '총괄 주방장', 4, 'buff'),
+  // 신화 (레시피로만 만들 수 있다)
+  chef('cooking_god', '요리의 신', 5, 'all', { emoji: '🌟', range: 270 }),
+  chef('dessert_witch', '시간을 멈추는 디저트 마녀', 5, 'chill', {
+    emoji: '🧁',
+    range: 270,
+    slow: { factor: 0.3, duration: 2.5 },
+    freeze: { every: 12, duration: 2.5 }, // 12초마다 레일 전체를 2.5초 동안 멈춘다
+    ability: '12초마다 레일 전체 2.5초 정지',
+  }),
 ];
+
+// 신화 레시피: 판 위에 재료 요리사가 모두 있으면 만들 수 있다. 재료는 사라진다.
+export const RECIPES = [
+  { result: 'cooking_god', ingredients: ['sushi_legend', 'hellfire_grill', 'head_chef'] },
+  { result: 'dessert_witch', ingredients: ['nitrogen_chef', 'bingsu_master', 'head_chef'] },
+];
+
+export function chefById(id) {
+  return CHEFS.find((c) => c.id === id);
+}
 
 export function chefsOfTier(tier) {
   return CHEFS.filter((c) => c.tier === tier);

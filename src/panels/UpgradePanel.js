@@ -5,7 +5,7 @@ import { createButton } from '../ui.js';
 
 const PANEL_WIDTH = 640;
 const ROW_HEIGHT = 120;
-const UPGRADE_TIERS = [1, 2, 3, 4];
+const UPGRADE_TIERS = [1, 2, 3, 4, 5];
 
 // 등급별 공격력 강화 창.
 // 게임은 멈추지 않고 계속 진행된다 (랜덤 디펜스답게 서둘러야 한다!).

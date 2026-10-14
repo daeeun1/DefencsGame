@@ -72,7 +72,7 @@ export const MAX_MERGE_TIER = 3;
 export const UPGRADE_DAMAGE_PER_LEVEL = 0.2;
 
 // 강화 비용: 등급별 기본 비용 × (현재 레벨 + 1)
-export const UPGRADE_BASE_COST = { 1: 20, 2: 40, 3: 80, 4: 150 };
+export const UPGRADE_BASE_COST = { 1: 20, 2: 40, 3: 80, 4: 150, 5: 300 };
 
 export function upgradeCost(tier, level) {
   return UPGRADE_BASE_COST[tier] * (level + 1);

@@ -29,7 +29,7 @@ import {
   summonCost,
   upgradeCost,
 } from '../data/balance.js';
-import { METHODS, TIERS, WEAKNESS_MULTIPLIER, chefsOfTier } from '../data/chefs.js';
+import { METHODS, TIERS, WEAKNESS_MULTIPLIER, RECIPES, chefById, chefsOfTier } from '../data/chefs.js';
 import { ORDER_TYPES } from '../data/orders.js';
 import { createButton } from '../ui.js';
 import Rail from '../objects/Rail.js';
@@ -37,6 +37,7 @@ import Order from '../objects/Order.js';
 import Chef from '../objects/Chef.js';
 import Projectile from '../objects/Projectile.js';
 import UpgradePanel from '../panels/UpgradePanel.js';
+import RecipePanel from '../panels/RecipePanel.js';
 
 // 배속 버튼을 누를 때마다 이 순서로 바뀐다
 const SPEEDS = [1, 2, 3];
@@ -69,6 +70,7 @@ export default class GameScene extends Phaser.Scene {
     this.bossRushTimer = 0; // 재벌 3세 "빨리빨리!" 타이머
     this.chefs = [];
     this.projectiles = [];
+    this.freezeTimeLeft = 0; // 디저트 마녀가 레일을 멈춘 남은 시간
     this.gold = START_GOLD;
     this.summonCount = 0; // 지금까지 뽑은 횟수 (뽑기 비용 계산용)
     this.upgradeLevels = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }; // 등급별 강화 레벨
@@ -89,6 +91,11 @@ export default class GameScene extends Phaser.Scene {
       levels: this.upgradeLevels,
       getGold: () => this.gold,
       onUpgrade: (tier) => this.upgrade(tier),
+    });
+
+    this.recipePanel = new RecipePanel(this, {
+      hasChef: (id) => this.chefs.some((c) => c.stats.id === id),
+      onCraft: (recipe) => this.craft(recipe),
     });
 
     this.input.on('pointerdown', (pointer) => this.onPointerDown(pointer));
@@ -118,9 +125,13 @@ export default class GameScene extends Phaser.Scene {
     }
     if (this.boss) this.bossAbility(dt);
 
-    // 3) 주문 이동 + 지속 피해
+    // 3) 주문 이동 + 지속 피해. 레일이 멈춰 있으면 일반 주문은 서 있고, 보스는 절반 속도
+    this.freezeTimeLeft = Math.max(0, this.freezeTimeLeft - dt);
+    const frozen = this.freezeTimeLeft > 0;
+    this.freezeOverlay.setVisible(frozen);
     for (const order of [...this.orders]) {
-      const dotDamage = order.step(dt);
+      const moveScale = frozen ? (order.isBoss ? 0.5 : 0) : 1;
+      const dotDamage = order.step(dt, moveScale);
       if (dotDamage > 0) this.damageOrder(order, dotDamage);
     }
 
@@ -129,6 +140,7 @@ export default class GameScene extends Phaser.Scene {
     for (const chef of this.chefs) {
       if (chef === dragging) continue; // 끌려가는 중에는 공격하지 않는다
       chef.step(dt, this.orders, (c, target) => this.attack(c, target));
+      if (chef.stats.freeze) this.freezeAbility(chef, dt);
     }
     for (const p of this.projectiles) p.step(dt);
     this.projectiles = this.projectiles.filter((p) => !p.done);
@@ -294,22 +306,34 @@ export default class GameScene extends Phaser.Scene {
 
   // 투사체가 닿았을 때 조리법에 맞는 효과를 준다
   resolveHit(stats, target, pos) {
+    // 지속 피해와 감속은 목표에게 먼저 건다 (끓이기, 차갑게, 요리의 신)
+    if (!target.dead) {
+      const bonus = this.weaknessMultiplier(stats, target);
+      if (stats.dot) target.applyDot(stats.dot.dps * bonus * this.upgradeMultiplier(stats.tier), stats.dot.duration);
+      if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration);
+    }
+
     if (stats.splash) {
-      // 굽기: 닿은 곳 주변 주문 모두에게 피해
+      // 범위 공격(굽기, 요리의 신): 닿은 곳 주변 주문 모두에게 피해
       for (const order of [...this.orders]) {
         if (Phaser.Math.Distance.Between(pos.x, pos.y, order.x, order.y) <= stats.splash) {
           this.damageOrder(order, this.damageAgainst(stats, order));
         }
       }
-      this.explosion(pos.x, pos.y, stats.splash);
-      return;
+      this.explosion(pos.x, pos.y, stats.splash, stats.method === 'all' ? 0xffd54f : 0xff7a1a);
+    } else if (!target.dead) {
+      this.damageOrder(target, this.damageAgainst(stats, target));
     }
+  }
 
-    if (target.dead) return;
-    const bonus = this.weaknessMultiplier(stats, target);
-    if (stats.dot) target.applyDot(stats.dot.dps * bonus * this.upgradeMultiplier(stats.tier), stats.dot.duration); // 끓이기
-    if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration); // 차갑게
-    this.damageOrder(target, this.damageAgainst(stats, target));
+  // 디저트 마녀: 일정 시간마다 레일 전체를 멈춘다
+  freezeAbility(chef, dt) {
+    const freeze = chef.stats.freeze;
+    chef.freezeTimer += dt;
+    if (chef.freezeTimer < freeze.every) return;
+    chef.freezeTimer = 0;
+    this.freezeTimeLeft = Math.max(this.freezeTimeLeft, freeze.duration);
+    this.showBanner('⏳ 시간 정지!', '#9fd8ff', 52);
   }
 
   // 요리사가 이 주문에 주는 피해: 기본 공격력 × 강화 배율 × 약점이면 1.5배
@@ -319,6 +343,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 약점이면 1.5배. 까다로운 주문은 약점이 아닌 조리법이면 절반.
   weaknessMultiplier(stats, order) {
+    if (stats.method === 'all') return WEAKNESS_MULTIPLIER; // 요리의 신은 항상 약점으로 공격
     if (order.weakness === stats.method) return WEAKNESS_MULTIPLIER;
     if (order.type.picky) return 0.5;
     return 1;
@@ -335,6 +360,38 @@ export default class GameScene extends Phaser.Scene {
     this.gold -= cost;
     this.upgradeLevels[tier] += 1;
     if (this.selectedChef) this.selectChef(this.selectedChef); // 정보창의 공격력 숫자 갱신
+    this.updateHud();
+  }
+
+  // ───────── 신화 레시피 ─────────
+
+  // 재료 요리사를 모두 갖췄으면, 레시피에 쓸 요리사들을 돌려준다 (없으면 null)
+  findIngredients(recipe) {
+    const used = [];
+    for (const id of recipe.ingredients) {
+      const chef = this.chefs.find((c) => c.stats.id === id && !used.includes(c));
+      if (!chef) return null;
+      used.push(chef);
+    }
+    return used;
+  }
+
+  canCraftAny() {
+    return RECIPES.some((r) => this.findIngredients(r));
+  }
+
+  // 신화 만들기: 재료 요리사들이 사라지고, 첫 번째 재료가 있던 칸에 신화 요리사가 생긴다
+  craft(recipe) {
+    const ingredients = this.findIngredients(recipe);
+    if (this.isOver || !ingredients) return;
+
+    const slot = ingredients[0].slot;
+    for (const chef of ingredients) this.removeChef(chef);
+    const data = chefById(recipe.result);
+    this.addChef(data, slot);
+
+    this.recipePanel.close();
+    this.showBanner(`🌈 신화 탄생!\n${data.emoji} ${data.name}`, colorToHex(TIERS[5].color), 44);
     this.updateHud();
   }
 
@@ -360,7 +417,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onPointerDown(pointer) {
-    if (this.isOver || this.upgradePanel.isOpen) return;
+    if (this.isOver || this.upgradePanel.isOpen || this.recipePanel.isOpen) return;
     const slot = this.slotAt(pointer.worldX, pointer.worldY);
     if (slot && slot.chef) {
       this.drag = { chef: slot.chef, startX: pointer.worldX, startY: pointer.worldY, moved: false };
@@ -495,8 +552,10 @@ export default class GameScene extends Phaser.Scene {
     const detail =
       s.method === 'buff'
         ? `주변 요리사 공격 속도 +${Math.round(s.buff.attackSpeed * 100)}%`
-        : `공격력 ${Math.round(s.damage * this.upgradeMultiplier(s.tier))} · ${method.role}${strongAgainst ? ` · ${strongAgainst}에 강함` : ''}`;
-    this.infoText.setText(`[${TIERS[s.tier].name}] ${method.emoji} ${s.name}\n${detail}`);
+        : `공격력 ${Math.round(s.damage * this.upgradeMultiplier(s.tier))} · ${s.ability ?? method.role}${
+            strongAgainst && !s.ability ? ` · ${strongAgainst}에 강함` : ''
+          }`;
+    this.infoText.setText(`[${TIERS[s.tier].name}] ${s.emoji ?? method.emoji} ${s.name}\n${detail}`);
   }
 
   // ───────── 게임 끝 ─────────
@@ -507,6 +566,7 @@ export default class GameScene extends Phaser.Scene {
     this.endReason = reason;
     this.isOver = true;
     this.upgradePanel.close();
+    this.recipePanel.close();
     this.updateHud();
 
     const centerX = GAME_WIDTH / 2;
@@ -545,6 +605,14 @@ export default class GameScene extends Phaser.Scene {
     this.orderLayer = this.add.layer();
     this.projectileLayer = this.add.layer();
     this.effectLayer = this.add.layer();
+
+    // 레일이 멈췄을 때 레일 위에 덮는 하늘색 얼음막
+    this.freezeOverlay = this.add.graphics().setVisible(false);
+    this.freezeOverlay.fillStyle(0x9fd8ff, 0.35);
+    this.freezeOverlay.fillRect(BOARD_X, this.boardY, BOARD_COLS * TILE, TILE);
+    this.freezeOverlay.fillRect(BOARD_X, this.boardY + (BOARD_ROWS - 1) * TILE, BOARD_COLS * TILE, TILE);
+    this.freezeOverlay.fillRect(BOARD_X, this.boardY + TILE, TILE, (BOARD_ROWS - 2) * TILE);
+    this.freezeOverlay.fillRect(BOARD_X + (BOARD_COLS - 1) * TILE, this.boardY + TILE, TILE, (BOARD_ROWS - 2) * TILE);
   }
 
   // 화면 위쪽 정보 표시줄: 웨이브, 남은 시간, 레일 위 주문 수, 골드
@@ -584,6 +652,17 @@ export default class GameScene extends Phaser.Scene {
     this.summonButton.setEnabled(!this.isOver && !full && this.gold >= cost);
 
     if (this.upgradePanel.isOpen) this.upgradePanel.refresh();
+    if (this.recipePanel.isOpen) this.recipePanel.refresh();
+
+    // 만들 수 있는 신화 레시피가 있으면 레시피 버튼을 금색으로 반짝이게
+    const ready = !this.isOver && this.canCraftAny();
+    if (ready !== this.recipeReady) {
+      this.recipeReady = ready;
+      this.recipeButton.setText(ready ? '📜 신화 레시피 (만들 수 있어요!)' : '📜 신화 레시피');
+      this.recipeButton.setColor(ready ? COLORS.gold : '#b9a48f');
+      this.recipeBlink.paused = !ready;
+      if (!ready) this.recipeButton.setAlpha(1);
+    }
   }
 
   // 주방 판: 바깥 한 줄은 회전 레일, 안쪽은 요리사 자리(체크무늬)
@@ -671,6 +750,22 @@ export default class GameScene extends Phaser.Scene {
       .text(BOARD_X, HUD_HEIGHT + 4, '← 처음으로', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' })
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
+
+    // 오른쪽 위: 신화 레시피 창 열기
+    this.recipeButton = this.add
+      .text(BOARD_X + BOARD_COLS * TILE, HUD_HEIGHT + 4, '📜 신화 레시피', {
+        fontFamily: FONT,
+        fontSize: '22px',
+        fontStyle: 'bold',
+        color: '#b9a48f',
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true });
+    this.recipeButton.on('pointerup', () => {
+      if (!this.isOver) this.recipePanel.open();
+    });
+    this.recipeReady = false;
+    this.recipeBlink = this.tweens.add({ targets: this.recipeButton, alpha: 0.35, duration: 450, yoyo: true, repeat: -1, paused: true });
   }
 
   // 배속 바꾸기: 1 → 2 → 3 → 1
@@ -718,8 +813,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // 굽기 공격이 터지는 효과
-  explosion(x, y, radius) {
-    const circle = this.add.circle(x, y, radius, 0xff7a1a, 0.35);
+  explosion(x, y, radius, color = 0xff7a1a) {
+    const circle = this.add.circle(x, y, radius, color, 0.35);
     this.effectLayer.add(circle);
     circle.setScale(0.3);
     this.tweens.add({ targets: circle, scale: 1, alpha: 0, duration: 250, onComplete: () => circle.destroy() });

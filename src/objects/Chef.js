@@ -14,10 +14,11 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.slot = slot; // 서 있는 칸 { col, row, x, y }
     this.cooldown = 0; // 다음 공격까지 남은 시간(초)
     this.attackSpeed = 1; // 총괄 주방장 버프로 올라가는 공격 속도 배율
+    this.freezeTimer = 0; // 디저트 마녀의 레일 정지 타이머
 
     const tierColor = TIERS[data.tier].color;
     const circle = scene.add.circle(0, 0, RADIUS, tierColor).setStrokeStyle(5, 0x3d2a1e);
-    const icon = scene.add.text(0, -2, METHODS[data.method].emoji, { fontFamily: FONT, fontSize: '42px' }).setOrigin(0.5);
+    const icon = scene.add.text(0, -2, data.emoji ?? METHODS[data.method].emoji, { fontFamily: FONT, fontSize: '42px' }).setOrigin(0.5);
     this.body_ = scene.add.container(0, 0, [circle, icon]);
 
     this.add(this.body_);

@@ -61,9 +61,10 @@ export default class Order extends Phaser.GameObjects.Container {
   }
 
   // 매 프레임 호출: 상태 효과 시간을 줄이고, 레일을 따라 앞으로 이동한다.
+  // moveScale: 이동 속도 배율 (디저트 마녀의 레일 정지 중이면 0)
   // 이번 프레임에 지속 피해로 받을 피해량을 돌려준다.
-  step(dt) {
-    let speed = BASE_SPEED * this.type.speed;
+  step(dt, moveScale = 1) {
+    let speed = BASE_SPEED * this.type.speed * moveScale;
     if (this.slow) {
       speed *= this.slow.factor;
       this.slow.timeLeft -= dt;
