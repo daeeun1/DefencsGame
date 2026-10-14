@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { TIERS } from '../data/chefs.js';
+import { EMOJI_FONT } from '../config.js';
 import { isChristmas } from '../eastereggs.js';
 
-const RADIUS = 40;
-const ICON_SIZE = 56; // 도구 그림을 이 크기 안에 들어오게 키운다
+const PAD_Y = 26; // 소환진(타원 받침)이 유닛 가운데보다 아래에 있는 거리
+const PAD_SQUASH = 0.45; // 동그라미를 이만큼 납작하게 눌러 바닥에 놓인 타원처럼 보이게
+const PAD_RADIUS = 44;
 
-// 주방 칸에 서 있는 요리사 하나.
-// 등급 색 동그라미 안에 조리법 도구(식칼, 프라이팬, 냄비, 얼음 등)가 그려져 있다.
+// 판 위 소환진에 올라가 있는 유닛(레시피 단계) 하나.
+// 등급 색으로 빛나는 소환진 위에 대표 요리 이모지가 둥실 떠 있다.
 export default class Chef extends Phaser.GameObjects.Container {
   constructor(scene, data, slot) {
     super(scene, slot.x, slot.y);
@@ -19,13 +21,35 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.rangeScale = 1; // 사거리 배율 (정전된 레스토랑에서 어두운 칸이면 줄어든다)
 
     const tierColor = TIERS[data.tier].color;
-    const plate = scene.add.circle(0, 0, RADIUS, tierColor).setStrokeStyle(5, 0x3d2a1e);
-    this.sprite = scene.add.image(0, 0, `tool_${data.tool ?? data.method}`);
-    // 도구마다 그림 크기가 달라서, 긴 쪽이 ICON_SIZE에 맞도록 정수 배로 키운다 (도트가 또렷하게)
-    this.sprite.setScale(Math.max(1, Math.floor(ICON_SIZE / Math.max(this.sprite.width, this.sprite.height))));
-    const parts = [plate, this.sprite];
-    // 🎅 크리스마스에는 동그라미에 산타 모자를 씌운다
-    if (isChristmas()) parts.push(scene.add.image(-22, -34, 'santa_hat').setScale(4).setAngle(-15));
+
+    // 소환진: 납작한 상자(squash) 안에 동그라미를 그려서 바닥에 놓인 타원처럼 보이게 한다
+    const glow = scene.add.graphics();
+    const glowSteps = data.tier >= 4 ? 5 : 3; // 전설 이상은 더 넓게 빛난다
+    for (let i = glowSteps; i >= 1; i--) {
+      glow.fillStyle(tierColor, 0.12);
+      glow.fillCircle(0, 0, PAD_RADIUS + i * 6);
+    }
+    glow.lineStyle(7, tierColor, 1);
+    glow.strokeCircle(0, 0, PAD_RADIUS);
+    // 안쪽에서 천천히 도는 점선 고리
+    this.runes = scene.add.graphics();
+    this.runes.lineStyle(4, 0xfff8ec, 0.9);
+    const dashes = 10;
+    for (let i = 0; i < dashes; i++) {
+      const start = (i / dashes) * Math.PI * 2;
+      this.runes.beginPath();
+      this.runes.arc(0, 0, PAD_RADIUS - 12, start, start + (Math.PI * 2) / dashes / 1.6);
+      this.runes.strokePath();
+    }
+    this.pad = scene.add.container(0, PAD_Y, [glow, this.runes]).setScale(1, PAD_SQUASH);
+    scene.tweens.add({ targets: this.runes, angle: 360, duration: 6000 - data.tier * 600, repeat: -1 });
+
+    // 이모지 밑 그림자 + 대표 요리 이모지
+    const shadow = scene.add.ellipse(0, PAD_Y, 46, 14, 0x000000, 0.25);
+    this.sprite = scene.add.text(0, -8, data.emoji, { fontFamily: EMOJI_FONT, fontSize: '52px' }).setOrigin(0.5);
+    const parts = [this.pad, shadow, this.sprite];
+    // 🎅 크리스마스에는 산타 모자를 씌운다
+    if (isChristmas()) parts.push(scene.add.image(-20, -42, 'santa_hat').setScale(4).setAngle(-15));
     this.body_ = scene.add.container(0, 0, parts);
 
     this.add(this.body_);
@@ -35,11 +59,11 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.body_.setScale(0.2);
     scene.tweens.add({ targets: this.body_, scale: 1, duration: 250, ease: 'Back.Out' });
 
-    // 숨 쉬듯 살짝 들썩이는 움직임 (요리사마다 박자가 조금씩 다르다)
+    // 둥실둥실 떠 있는 움직임 (유닛마다 박자가 조금씩 다르다)
     scene.tweens.add({
       targets: this.sprite,
-      y: -4,
-      duration: Phaser.Math.Between(450, 650),
+      y: -16,
+      duration: Phaser.Math.Between(650, 850),
       delay: Phaser.Math.Between(0, 500),
       yoyo: true,
       repeat: -1,
@@ -51,7 +75,7 @@ export default class Chef extends Phaser.GameObjects.Container {
     return this.data_;
   }
 
-  // 매 프레임 호출. 공격할 수 있으면 목표를 골라 onAttack(요리사, 목표)을 부른다.
+  // 매 프레임 호출. 공격할 수 있으면 목표를 골라 onAttack(유닛, 목표)을 부른다.
   step(dt, orders, onAttack) {
     if (this.data_.method === 'buff') return; // 총괄 주방장은 직접 공격하지 않는다
 

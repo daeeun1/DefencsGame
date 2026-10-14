@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS, FONT } from '../config.js';
+import { GAME_WIDTH, GAME_HEIGHT, COLORS, FONT, EMOJI_FONT } from '../config.js';
 import { createButton } from '../ui.js';
 import { getSave, totalStars } from '../save.js';
 import { playMusic, isOn, toggle } from '../audio.js';
@@ -17,17 +17,17 @@ export default class TitleScene extends Phaser.Scene {
     const save = getSave();
     playMusic('title');
 
-    // 주방 로고: 가운데 샐러드, 양옆에 식칼과 프라이팬
+    // 주방 로고: 가운데 샐러드, 양옆에 빵과 케이크
     const logoY = top + 265;
     this.add.circle(centerX, logoY, 110, 0xf3e3c3).setStrokeStyle(8, 0xe85d3a);
     const salad = this.add.image(centerX, logoY + 5, 'order_salad').setScale(10);
     this.add.circle(centerX - 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
     this.add.circle(centerX + 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
-    const knife = this.add.image(centerX - 165, logoY + 40, 'tool_cut').setScale(9).setAngle(-20);
-    const pan = this.add.image(centerX + 165, logoY + 40, 'tool_grill').setScale(11).setAngle(10);
+    const bread = this.add.text(centerX - 165, logoY + 40, '🍞', { fontFamily: EMOJI_FONT, fontSize: '64px' }).setOrigin(0.5).setAngle(-20);
+    const cake = this.add.text(centerX + 165, logoY + 40, '🍰', { fontFamily: EMOJI_FONT, fontSize: '64px' }).setOrigin(0.5).setAngle(10);
     this.tweens.add({ targets: salad, y: salad.y - 10, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.tweens.add({ targets: knife, angle: -30, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.tweens.add({ targets: pan, angle: 20, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 200 });
+    this.tweens.add({ targets: bread, angle: -30, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: cake, angle: 20, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 200 });
 
     this.add
       .text(centerX, top + 460, '주방 디펜스', {
@@ -60,7 +60,7 @@ export default class TitleScene extends Phaser.Scene {
 
     createButton(this, centerX, top + 800, 400, 110, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 38 });
     createButton(this, centerX, top + 930, 400, 100, '🏪 가게 강화', () => this.scene.start('Shop'));
-    createButton(this, centerX, top + 1050, 400, 100, '📖 요리사 도감', () => this.scene.start('Codex'));
+    createButton(this, centerX, top + 1050, 400, 100, '📖 레시피 도감', () => this.scene.start('Codex'));
 
     // 설정: 효과음 / 음악 / 진동 켜고 끄기
     const options = [

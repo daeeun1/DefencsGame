@@ -2,12 +2,12 @@ import Phaser from 'phaser';
 
 const SPEED = 900; // 화면 픽셀/초
 
-// 조리법별 투사체 모양
+// 레시피 줄별 투사체 모양
 const LOOKS = {
-  cut: { color: 0xffffff, radius: 7 }, // 칼날
-  grill: { color: 0xff7a1a, radius: 12 }, // 불덩이
-  boil: { color: 0xc9884a, radius: 10 }, // 끓는 국물
-  chill: { color: 0x9fd8ff, radius: 9 }, // 얼음
+  cut: { color: 0xf5d79e, radius: 7 }, // 🍞 빵 부스러기
+  grill: { color: 0xff7a1a, radius: 12 }, // 🍖 불덩이
+  boil: { color: 0xc9884a, radius: 10 }, // 🍲 끓는 국물
+  chill: { color: 0xffc2dc, radius: 9 }, // 🍰 차가운 크림
   all: { color: 0xffd54f, radius: 13 }, // 요리의 신: 황금빛
 };
 

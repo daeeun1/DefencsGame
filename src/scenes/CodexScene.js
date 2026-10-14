@@ -1,18 +1,19 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, COLORS, FONT } from '../config.js';
+import { GAME_WIDTH, COLORS, FONT, EMOJI_FONT } from '../config.js';
 import { createButton } from '../ui.js';
 import { playMusic, sfx } from '../audio.js';
 import { getSave, writeSave, codexLevel, isDiscovered } from '../save.js';
-import { CHEFS, METHODS, TIERS } from '../data/chefs.js';
+import { CHEFS, LINES, METHODS, TIERS } from '../data/chefs.js';
 import { CODEX_DAMAGE_PER_LEVEL, CODEX_MAX_LEVEL, codexCost } from '../data/progress.js';
 import { EGG_TOTAL, eggCount, findEgg, MAKER_RECIPE } from '../eastereggs.js';
 
-const COLS = 3;
-const CARD_W = 200;
-const CARD_H = 125;
-const GAP = 12;
+const COLS = 4;
+const CARD_W = 160;
+const CARD_H = 128;
+const GAP = 10;
 
-// 📖 요리사 도감: 만난 요리사를 모아 보고, 팁으로 요리사별 공격력을 영구히 올린다.
+// 📖 레시피 도감: 만난 유닛을 모아 보고, 팁으로 유닛별 공격력을 영구히 올린다.
+// 레시피 줄마다 한 열(빵, 고기, 디저트, 국물)에 일반 → 전설 순서로 놓고, 맨 아래 줄은 특별 유닛.
 export default class CodexScene extends Phaser.Scene {
   constructor() {
     super('Codex');
@@ -24,7 +25,7 @@ export default class CodexScene extends Phaser.Scene {
 
     this.add.rectangle(0, 0, GAME_WIDTH, 120, COLORS.hud).setOrigin(0);
     this.add
-      .text(GAME_WIDTH / 2, 45, '📖 요리사 도감', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: COLORS.text })
+      .text(GAME_WIDTH / 2, 45, '📖 레시피 도감', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
     this.headerInfo = this.add
       .text(GAME_WIDTH / 2, 95, '', { fontFamily: FONT, fontSize: '24px', color: COLORS.gold })
@@ -35,39 +36,57 @@ export default class CodexScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
 
-    // 요리사 카드 (3열)
+    // 유닛 카드: 열 = 레시피 줄, 행 = 등급. 마지막 행은 특별 유닛 (총괄 주방장, 신화, 비밀)
     const gridWidth = COLS * CARD_W + (COLS - 1) * GAP;
     const left = (GAME_WIDTH - gridWidth) / 2;
-    const gridTop = 140;
-    this.cards = CHEFS.map((chef, i) => {
-      const x = left + (i % COLS) * (CARD_W + GAP);
-      const y = gridTop + Math.floor(i / COLS) * (CARD_H + GAP);
+    const gridTop = 186;
+    LINES.forEach((method, col) => {
+      this.add
+        .text(left + col * (CARD_W + GAP) + CARD_W / 2, gridTop - 30, `${METHODS[method].emoji} ${METHODS[method].name} 줄`, {
+          fontFamily: FONT,
+          fontSize: '22px',
+          fontStyle: 'bold',
+          color: COLORS.gold,
+        })
+        .setOrigin(0.5);
+    });
+    const specials = CHEFS.filter((c) => !LINES.includes(c.method) || c.tier === 5);
+    const place = (chef) => {
+      const special = specials.indexOf(chef);
+      if (special >= 0) return [special, 4];
+      return [LINES.indexOf(chef.method), chef.tier - 1];
+    };
+    this.cards = CHEFS.map((chef) => {
+      const [col, row] = place(chef);
+      const x = left + col * (CARD_W + GAP);
+      const y = gridTop + row * (CARD_H + GAP) + (row === 4 ? 14 : 0);
       const found = isDiscovered(chef.id);
 
       const bg = this.add.graphics();
-      this.add.circle(x + 45, y + CARD_H / 2, 34, found ? TIERS[chef.tier].color : 0x5a4a3e).setStrokeStyle(4, 0x2b1d14);
-      if (found) {
-        const icon = this.add.image(x + 45, y + CARD_H / 2, `tool_${chef.tool ?? chef.method}`);
-        icon.setScale(Math.max(1, Math.floor(44 / Math.max(icon.width, icon.height))));
-      }
-      else this.add.text(x + 45, y + CARD_H / 2, '?', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: '#b9a48f' }).setOrigin(0.5);
-      this.add.text(x + 88, y + 22, found ? chef.name : '???', {
-        fontFamily: FONT,
-        fontSize: found && chef.name.length > 9 ? '16px' : '20px', // 긴 이름은 작게
-        fontStyle: 'bold',
-        color: found ? COLORS.text : '#8a7a6a',
-        wordWrap: { width: CARD_W - 95, useAdvancedWrap: true },
-      });
-      const level = this.add.text(x + 88, y + CARD_H - 34, '', { fontFamily: FONT, fontSize: '20px', color: COLORS.gold });
+      const cx = x + CARD_W / 2;
+      this.add.circle(cx, y + 44, 32, found ? TIERS[chef.tier].color : 0x5a4a3e).setStrokeStyle(4, 0x2b1d14);
+      if (found) this.add.text(cx, y + 44, chef.emoji, { fontFamily: EMOJI_FONT, fontSize: '36px' }).setOrigin(0.5);
+      else this.add.text(cx, y + 44, '?', { fontFamily: FONT, fontSize: '36px', fontStyle: 'bold', color: '#b9a48f' }).setOrigin(0.5);
+      const shown = found ? chef.name : '???';
+      this.add
+        .text(cx, y + 92, shown, {
+          fontFamily: FONT,
+          fontSize: shown.length > 7 ? '14px' : '18px', // 긴 이름은 작게
+          fontStyle: 'bold',
+          color: found ? COLORS.text : '#8a7a6a',
+          align: 'center',
+          wordWrap: { width: CARD_W - 12, useAdvancedWrap: true },
+        })
+        .setOrigin(0.5);
+      const level = this.add.text(x + CARD_W - 8, y + 8, '', { fontFamily: FONT, fontSize: '16px', color: COLORS.gold }).setOrigin(1, 0);
 
       const hit = this.add.rectangle(x, y, CARD_W, CARD_H, 0, 0).setOrigin(0).setInteractive({ useHandCursor: true });
       hit.on('pointerup', () => this.select(chef));
       return { chef, bg, x, y, level, found };
     });
 
-    // 아래쪽: 고른 요리사 정보와 레벨업 버튼
-    const rows = Math.ceil(CHEFS.length / COLS);
-    const detailTop = gridTop + rows * (CARD_H + GAP) + 10;
+    // 아래쪽: 고른 유닛 정보와 레벨업 버튼
+    const detailTop = gridTop + 5 * (CARD_H + GAP) + 30;
     this.detail = this.add.text(40, detailTop, '', {
       fontFamily: FONT,
       fontSize: '24px',
@@ -79,7 +98,7 @@ export default class CodexScene extends Phaser.Scene {
       fontSize: 26,
     });
 
-    // 🥚 비밀 요리사를 뺀 모든 요리사를 발견하면 "만든 사람의 레시피"가 열린다
+    // 🥚 비밀 유닛을 뺀 모든 유닛을 발견하면 "만든 사람의 레시피"가 열린다
     const complete = CHEFS.filter((c) => !c.hidden).every((c) => isDiscovered(c.id));
     if (complete) {
       const secret = this.add
@@ -155,14 +174,14 @@ export default class CodexScene extends Phaser.Scene {
 
     const chef = this.selected;
     if (!chef) {
-      this.detail.setText('요리사를 누르면 정보가 보여요.\n레벨을 올리면 그 요리사의 공격력이\n모든 판에서 영구히 올라가요.');
+      this.detail.setText('카드를 누르면 정보가 보여요.\n레벨을 올리면 그 유닛의 공격력이\n모든 판에서 영구히 올라가요.');
       this.levelButton.setVisible(false);
       return;
     }
     this.levelButton.setVisible(true);
 
     if (!isDiscovered(chef.id)) {
-      this.detail.setText(`❓ 아직 만나지 못한 요리사예요.\n[${TIERS[chef.tier].name}] 등급`);
+      this.detail.setText(`❓ 아직 만나지 못한 유닛이에요.\n[${TIERS[chef.tier].name}] 등급`);
       this.levelButton.setLabel('🔒');
       this.levelButton.setEnabled(false);
       return;
@@ -171,7 +190,7 @@ export default class CodexScene extends Phaser.Scene {
     const lv = codexLevel(chef.id);
     const bonus = Math.round(lv * CODEX_DAMAGE_PER_LEVEL * 100);
     this.detail.setText(
-      `[${TIERS[chef.tier].name}] ${chef.name}\n${chef.ability ?? METHODS[chef.method].role}\nLv.${lv} / ${CODEX_MAX_LEVEL} · 공격력 +${bonus}%`,
+      `[${TIERS[chef.tier].name}] ${chef.emoji} ${chef.name}\n${chef.ability ?? METHODS[chef.method].role}\nLv.${lv} / ${CODEX_MAX_LEVEL} · 공격력 +${bonus}%`,
     );
     const maxed = lv >= CODEX_MAX_LEVEL;
     const cost = codexCost(chef.tier, lv);

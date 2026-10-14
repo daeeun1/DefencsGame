@@ -32,7 +32,7 @@ export const KITCHENS = [
     id: 'chinese',
     emoji: '🔥',
     name: '불난 중식당',
-    desc: '칸에 불이 붙으면 요리사가 쉬어요',
+    desc: '칸에 불이 붙으면 그 칸 요리가 쉬어요',
     unlockStars: 4,
     tipBonus: 1.4,
     floor: [0xf6d9c8, 0xebc1a8],

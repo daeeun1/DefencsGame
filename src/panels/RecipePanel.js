@@ -101,7 +101,7 @@ export default class RecipePanel {
         const have = this.hasChef(id);
         if (!have) ready = false;
         const chef = chefById(id);
-        row.ingredientTexts[j].setText(`${have ? '✅' : '❌'} ${chef.name}`);
+        row.ingredientTexts[j].setText(`${have ? '✅' : '❌'} ${chef.emoji} ${chef.name}`);
         row.ingredientTexts[j].setColor(have ? COLORS.text : '#8a7a6a');
       });
       // 잠긴 레시피: 별이 모자라면 만들 수 없다

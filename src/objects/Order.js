@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { ORDER_TYPES, showsWeakness } from '../data/orders.js';
 import { BASE_SPEED, orderHp, orderReward } from '../data/balance.js';
+import { METHODS } from '../data/chefs.js';
+import { EMOJI_FONT } from '../config.js';
 
 const BAR_HEIGHT = 8;
 const COOKING_METHODS = ['cut', 'grill', 'boil', 'chill'];
@@ -34,7 +36,7 @@ export default class Order extends Phaser.GameObjects.Container {
       this.startDistance = startDistance; // 여기서 한 바퀴를 돌면 사라진다
     }
 
-    // 약한 조리법. 까다로운 주문은 나올 때마다 무작위로 정해진다.
+    // 약한 레시피 줄. 까다로운 주문은 나올 때마다 무작위로 정해진다.
     this.weakness = this.type.weakness === 'random' ? Phaser.Utils.Array.GetRandom(COOKING_METHODS) : this.type.weakness;
 
     // 상태 효과
@@ -56,11 +58,11 @@ export default class Order extends Phaser.GameObjects.Container {
       .setOrigin(0, 0.5);
     this.add([this.icon, this.barBack, this.barFill]);
 
-    // 약점 표시 (까다로운 주문, 미식 대왕): 머리 위 작은 동그라미 안에 조리법 그림
+    // 약점 표시 (까다로운 주문, 미식 대왕): 머리 위 작은 동그라미 안에 약한 레시피 줄 이모지
     if (showsWeakness(this.type)) {
       const badgeY = -size * 0.65;
       this.badgeCircle = scene.add.circle(size * 0.45, badgeY, 20, 0xfff8ec).setStrokeStyle(3, 0x3d2a1e);
-      this.badge = scene.add.image(size * 0.45, badgeY, 'tool_cut').setScale(3);
+      this.badge = scene.add.text(size * 0.45, badgeY, '', { fontFamily: EMOJI_FONT, fontSize: '24px' }).setOrigin(0.5);
       this.add([this.badgeCircle, this.badge]);
       this.updateBadge();
     }
@@ -154,7 +156,7 @@ export default class Order extends Phaser.GameObjects.Container {
   }
 
   updateBadge() {
-    if (this.badge) this.badge.setTexture(`tool_${this.weakness}`);
+    if (this.badge) this.badge.setText(METHODS[this.weakness].emoji);
   }
 
   updateTint() {

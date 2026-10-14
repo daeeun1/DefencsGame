@@ -1,6 +1,6 @@
 # 🍳 주방 디펜스
 
-회전 레일 위를 도는 주문을 요리사들이 처리하는 **랜덤 타워 디펜스** 휴대폰 게임입니다.
+회전 레일 위를 도는 주문을 요리(레시피 단계 유닛)로 처리하는 **랜덤 타워 디펜스** 휴대폰 게임입니다.
 기획 내용은 [DESIGN.md](DESIGN.md)에 있습니다.
 
 ## 바로 플레이하기
@@ -36,14 +36,14 @@ src/
   data/
     balance.js        웨이브 길이, 체력 증가율 같은 밸런스 숫자
     orders.js         주문(적) 종류와 능력치
-    chefs.js          요리사 목록, 등급, 조리법별 능력치, 신화 레시피
+    chefs.js          레시피 줄(빵·고기·디저트·국물) 유닛 목록, 등급, 능력치, 신화 레시피
     progress.js       판 끝 보상, 가게 강화, 도감 숫자
     kitchens.js       주방(스테이지) 목록과 기믹
   objects/
     Rail.js           회전 레일 경로 계산
     Order.js          레일 위를 도는 주문 하나 (감속, 지속 피해 포함)
-    Chef.js           칸에 서서 주문을 공격하는 요리사 하나
-    Projectile.js     요리사가 던지는 칼, 불덩이, 국물, 얼음
+    Chef.js           소환진 위에서 주문을 공격하는 유닛 하나 (요리 이모지)
+    Projectile.js     유닛이 던지는 빵 부스러기, 불덩이, 국물, 크림
   panels/
     UpgradePanel.js   등급별 강화 창
     RecipePanel.js    신화 레시피 창
@@ -55,7 +55,7 @@ src/
     TitleScene.js     첫 화면 (제목, 팁과 별, 메뉴)
     KitchenSelectScene.js  주방 선택 화면
     ShopScene.js      가게 강화 화면
-    CodexScene.js     요리사 도감 화면
+    CodexScene.js     레시피 도감 화면
     GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 합성, 강화, 승패 판정)
 ```
 
@@ -63,5 +63,6 @@ src/
 
 - [Phaser](https://phaser.io) — 2D 게임 엔진 (MIT 라이선스)
 - [갈무리(Galmuri)](https://galmuri.quiple.dev) — 한글 도트 글꼴, © Minseo Lee (SIL Open Font License 1.1)
-- 도트 그림은 `src/art/sprites.js`에 글자 격자로 직접 그렸습니다.
+- 도트 그림(주문, 손님)은 `src/art/sprites.js`에 글자 격자로 직접 그렸습니다.
+- 유닛 그림은 기기에 들어 있는 컬러 이모지 글꼴로 표시합니다.
 - 효과음과 배경음악은 `src/audio.js`에서 Web Audio로 직접 합성합니다.
