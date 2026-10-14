@@ -12,7 +12,7 @@ const DOT_TINT = 0xffb37a; // 지속 피해 중일 때 주황빛
 const GOLDEN_TINT = 0xffd54f; // 🥚 황금 주문
 
 // 레일 위를 도는 주문 하나 (VIP 손님도 이 클래스를 쓴다).
-// 이모지 그림과 체력 막대로 이루어져 있다.
+// 접시 위 이모지와 체력 막대로 이루어져 있다.
 export default class Order extends Phaser.GameObjects.Container {
   // options.golden: 🥚 황금 주문 (빠르고, 한 바퀴만 돌고 사라지며, 잡으면 골드를 많이 준다)
   constructor(scene, rail, typeKey, wave, startDistance = 0, options = {}) {
@@ -48,15 +48,21 @@ export default class Order extends Phaser.GameObjects.Container {
     this.barWidth = this.isBoss ? 120 : 64;
     const barY = size * 0.7;
 
-    // 16 x 16 도트 그림을 크기에 맞게 키운다 (보통 4배 = 64)
-    this.icon = scene.add.image(0, 0, `order_${typeKey}`).setScale(Math.round(size / 14));
+    // 받침: 일반 주문은 회전초밥 접시, VIP 손님은 빨간 테두리 방석
+    const plate = this.isBoss
+      ? scene.add.circle(0, 0, size * 0.62, 0x3d2a1e, 0.85).setStrokeStyle(5, 0xff5a5a)
+      : scene.add.ellipse(0, size * 0.22, size * 1.05, size * 0.5, 0xfff8ec).setStrokeStyle(4, 0x9aa4b2);
+    // 주문 이모지 (접시 위에 살짝 떠 있게)
+    this.icon = scene.add
+      .text(0, this.isBoss ? 0 : -size * 0.08, this.type.emoji, { fontFamily: EMOJI_FONT, fontSize: `${Math.round(size * 0.82)}px` })
+      .setOrigin(0.5);
 
     // 체력 막대: 회색 바탕 위에 초록색(보스는 빨간색)이 줄어든다
     this.barBack = scene.add.rectangle(0, barY, this.barWidth, BAR_HEIGHT + (this.isBoss ? 4 : 0), 0x000000, 0.5);
     this.barFill = scene.add
       .rectangle(-this.barWidth / 2, barY, this.barWidth, BAR_HEIGHT + (this.isBoss ? 4 : 0), this.isBoss ? 0xff5a5a : 0x6ddc6d)
       .setOrigin(0, 0.5);
-    this.add([this.icon, this.barBack, this.barFill]);
+    this.add([plate, this.icon, this.barBack, this.barFill]);
 
     // 약점 표시 (까다로운 주문, 미식 대왕): 머리 위 작은 동그라미 안에 약한 레시피 줄 이모지
     if (showsWeakness(this.type)) {

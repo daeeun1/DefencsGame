@@ -66,8 +66,8 @@ src/
 
 - [Phaser](https://phaser.io) — 2D 게임 엔진 (MIT 라이선스)
 - [갈무리(Galmuri)](https://galmuri.quiple.dev) — 한글 도트 글꼴, © Minseo Lee (SIL Open Font License 1.1)
-- 도트 그림(주문, 손님)은 `src/art/sprites.js`에 글자 격자로 직접 그렸습니다.
-- 유닛 그림은 기기에 들어 있는 컬러 이모지 글꼴로 표시합니다.
+- 산타 모자 도트 그림은 `src/art/sprites.js`에 글자 격자로 직접 그렸습니다.
+- 유닛, 주문, 손님 그림은 기기에 들어 있는 컬러 이모지 글꼴로 표시합니다.
 - 효과음과 배경음악은 `src/audio.js`에서 Web Audio로 직접 합성합니다.
 
 ## ☁️ 클라우드 저장 (Firebase)
