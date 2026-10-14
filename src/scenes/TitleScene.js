@@ -5,8 +5,11 @@ import { getSave, totalStars } from '../save.js';
 import { playMusic, isOn, toggle } from '../audio.js';
 import { todaysSpecial, DAILY_TIP_BONUS } from '../data/daily.js';
 import { cloudStatus, linkedAccount, linkGoogle, onCloudChange } from '../cloud.js';
+import { canFullscreen, isFullscreen, toggleFullscreen } from '../fullscreen.js';
 
-// 첫 화면: 게임 제목, 내 팁과 별, 영업 시작 / 가게 강화 / 요리사 도감 버튼.
+const TAB_BAR_HEIGHT = 130;
+
+// 첫 화면: 로고, 내 팁과 별, 큰 버튼 2개(영업 시작, 오늘의 특선), 아래 메뉴줄(가게, 도감, 랭킹, 설정).
 export default class TitleScene extends Phaser.Scene {
   constructor() {
     super('Title');
@@ -15,12 +18,13 @@ export default class TitleScene extends Phaser.Scene {
   create() {
     const centerX = GAME_WIDTH / 2;
     const height = this.scale.height; // 휴대폰마다 다른 실제 화면 높이
-    const top = (height - GAME_HEIGHT) / 2; // 기준 높이보다 긴 만큼 전체를 가운데로 내린다
+    // 메뉴줄을 뺀 공간 안에서, 기준 높이보다 남는 만큼 가운데로 내린다
+    const top = Math.max(0, (height - TAB_BAR_HEIGHT - (GAME_HEIGHT - TAB_BAR_HEIGHT)) / 2);
     const save = getSave();
     playMusic('title');
 
     // 주방 로고: 가운데 샐러드, 양옆에 빵과 케이크
-    const logoY = top + 265;
+    const logoY = top + 210;
     this.add.circle(centerX, logoY, 110, 0xf3e3c3).setStrokeStyle(8, 0xe85d3a);
     const salad = this.add.image(centerX, logoY + 5, 'order_salad').setScale(10);
     this.add.circle(centerX - 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
@@ -32,25 +36,13 @@ export default class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: cake, angle: 20, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 200 });
 
     this.add
-      .text(centerX, top + 460, '주방 디펜스', {
-        fontFamily: FONT,
-        fontSize: '84px',
-        fontStyle: 'bold',
-        color: COLORS.text,
-      })
+      .text(centerX, top + 405, '주방 디펜스', { fontFamily: FONT, fontSize: '84px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
-
     this.add
-      .text(centerX, top + 545, '레일 위 주문을 막아라!', {
-        fontFamily: FONT,
-        fontSize: '32px',
-        color: COLORS.gold,
-      })
+      .text(centerX, top + 485, '레일 위 주문을 막아라!', { fontFamily: FONT, fontSize: '32px', color: COLORS.gold })
       .setOrigin(0.5);
-
-    // 내 재화: 팁과 별
     this.add
-      .text(centerX, top + 640, `🪙 팁 ${save.tips}    ⭐ 별 ${totalStars()}`, {
+      .text(centerX, top + 570, `🪙 팁 ${save.tips}    ⭐ 별 ${totalStars()}`, {
         fontFamily: FONT,
         fontSize: '34px',
         fontStyle: 'bold',
@@ -60,92 +52,134 @@ export default class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    createButton(this, centerX, top + 800, 400, 110, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 38 });
-    createButton(this, centerX - 105, top + 930, 200, 100, '🏪 가게\n강화', () => this.scene.start('Shop'), { fontSize: 28 });
-    createButton(this, centerX + 105, top + 930, 200, 100, '📖 레시피\n도감', () => this.scene.start('Codex'), { fontSize: 28 });
-    createButton(this, centerX - 105, top + 1050, 200, 100, '🍽️ 오늘의\n특선', () => this.showDaily(), { fontSize: 28, color: 0x8e4fc0 });
-    createButton(this, centerX + 105, top + 1050, 200, 100, '🏆 랭킹', () => this.scene.start('Ranking'), { color: 0xc77d2e });
-
-    // 설정: 효과음 / 음악 / 진동 켜고 끄기
-    const options = [
-      { key: 'sfx', on: '🔊 효과음', off: '🔇 효과음' },
-      { key: 'music', on: '🎵 음악', off: '🚫 음악' },
-      { key: 'vibration', on: '📳 진동', off: '📴 진동' },
-    ];
-    options.forEach((option, i) => {
-      const label = () => `${isOn(option.key) ? option.on : option.off} ${isOn(option.key) ? '켬' : '끔'}`;
-      const text = this.add
-        .text(centerX + (i - 1) * 220, height - 120, label(), {
-          fontFamily: FONT,
-          fontSize: '24px',
-          color: COLORS.text,
-          backgroundColor: '#3d2a1e',
-          padding: { x: 14, y: 10 },
-        })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
-      text.on('pointerup', () => {
-        toggle(option.key);
-        text.setText(label());
-        text.setAlpha(isOn(option.key) ? 1 : 0.6);
-      });
-      text.setAlpha(isOn(option.key) ? 1 : 0.6);
+    // 큰 버튼 2개
+    createButton(this, centerX, top + 730, 560, 140, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 48 });
+    const { special } = todaysSpecial();
+    createButton(this, centerX, top + 885, 560, 120, `🍽️ 오늘의 특선\n${special.emoji} ${special.name}`, () => this.showDaily(), {
+      fontSize: 32,
+      color: 0x8e4fc0,
     });
 
-    this.createCloudBar(centerX, top + 62);
-
-    this.add
-      .text(centerX, height - 50, 'v0.9 · 개발 중', {
-        fontFamily: FONT,
-        fontSize: '22px',
-        color: '#b9a48f',
-      })
-      .setOrigin(0.5);
+    // 아래 메뉴줄
+    this.createTabBar(height);
+    // ⚙️ 설정에서 바꿀 수 있는 클라우드 상태: 클라우드에서 기록을 받아 오면 화면을 다시 그린다
+    const off = onCloudChange((event) => {
+      if (event === 'pulled') this.scene.restart();
+    });
+    this.events.once('shutdown', off);
   }
 
-  // ☁️ 클라우드 저장 상태와 🔗 구글 계정 연결 버튼
-  createCloudBar(x, y) {
+  // 휴대폰 앱처럼 화면 맨 아래 메뉴줄: 아이콘 + 작은 글씨
+  createTabBar(height) {
+    const y = height - TAB_BAR_HEIGHT;
+    this.add.rectangle(0, y, GAME_WIDTH, TAB_BAR_HEIGHT, 0x3d2a1e).setOrigin(0);
+    this.add.rectangle(0, y, GAME_WIDTH, 4, 0x1c120c).setOrigin(0);
+    const tabs = [
+      { emoji: '🏪', label: '가게', onClick: () => this.scene.start('Shop') },
+      { emoji: '📖', label: '도감', onClick: () => this.scene.start('Codex') },
+      { emoji: '🏆', label: '랭킹', onClick: () => this.scene.start('Ranking') },
+      { emoji: '⚙️', label: '설정', onClick: () => this.showSettings() },
+    ];
+    const width = GAME_WIDTH / tabs.length;
+    tabs.forEach((tab, i) => {
+      const x = width * i + width / 2;
+      const hit = this.add.rectangle(x, y + TAB_BAR_HEIGHT / 2, width, TAB_BAR_HEIGHT, 0, 0).setInteractive({ useHandCursor: true });
+      const icon = this.add.text(x, y + 48, tab.emoji, { fontFamily: EMOJI_FONT, fontSize: '48px' }).setOrigin(0.5);
+      this.add.text(x, y + 98, tab.label, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5);
+      hit.on('pointerdown', () => icon.setScale(0.9));
+      hit.on('pointerout', () => icon.setScale(1));
+      hit.on('pointerup', () => {
+        icon.setScale(1);
+        tab.onClick();
+      });
+    });
+  }
+
+  // ⚙️ 설정 창: 소리, 진동, 전체 화면, 클라우드 저장과 구글 계정 연결
+  showSettings() {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = this.scale.height / 2;
+    const parts = [];
+    const shade = this.add.rectangle(0, 0, GAME_WIDTH, this.scale.height, 0x000000, 0.7).setOrigin(0).setInteractive();
+    const box = this.add.graphics();
+    box.fillStyle(0x3d2a1e, 1);
+    box.fillRoundedRect(centerX - 300, centerY - 400, 600, 800, 24);
+    box.lineStyle(5, 0xb9a48f, 1);
+    box.strokeRoundedRect(centerX - 300, centerY - 400, 600, 800, 24);
+    parts.push(
+      shade,
+      box,
+      this.add.text(centerX, centerY - 335, '⚙️ 설정', { fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5),
+    );
+
+    // 켜고 끄는 버튼들
+    const toggles = [
+      { on: '🔊 효과음 켬', off: '🔇 효과음 끔', get: () => isOn('sfx'), set: () => toggle('sfx') },
+      { on: '🎵 음악 켬', off: '🚫 음악 끔', get: () => isOn('music'), set: () => toggle('music') },
+      { on: '📳 진동 켬', off: '📴 진동 끔', get: () => isOn('vibration'), set: () => toggle('vibration') },
+    ];
+    if (canFullscreen()) toggles.push({ on: '⛶ 전체 화면 켬', off: '⛶ 전체 화면 끔', get: isFullscreen, set: toggleFullscreen });
+    toggles.forEach((item, i) => {
+      const label = () => (item.get() ? item.on : item.off);
+      const button = createButton(this, centerX, centerY - 235 + i * 105, 440, 90, label(), () => {
+        item.set();
+        // 전체 화면은 바뀌는 데 잠깐 걸린다
+        this.time.delayedCall(250, () => button.active && button.setLabel(label()).setAlpha(item.get() ? 1 : 0.6));
+        button.setLabel(label()).setAlpha(item.get() ? 1 : 0.6);
+      }, { fontSize: 30, color: 0x5a4a3e });
+      button.setAlpha(item.get() ? 1 : 0.6);
+      parts.push(button);
+    });
+
+    // 클라우드 저장
+    const cloudY = centerY + 205;
     const labels = {
       connecting: '☁️ 연결 중...',
       saving: '☁️ 저장 중...',
       synced: '☁️ 클라우드 저장됨',
       offline: '📴 오프라인 (휴대폰에만 저장)',
     };
-    const statusText = this.add.text(x, y - 26, '', { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' }).setOrigin(0.5);
-    const linkButton = this.add
-      .text(x, y + 20, '', {
+    const status = this.add.text(centerX, cloudY - 30, '', { fontFamily: FONT, fontSize: '24px', color: '#d8c8b4' }).setOrigin(0.5);
+    const link = this.add
+      .text(centerX, cloudY + 20, '', {
         fontFamily: FONT,
-        fontSize: '22px',
+        fontSize: '24px',
         color: COLORS.text,
-        backgroundColor: '#3d2a1e',
-        padding: { x: 16, y: 8 },
+        backgroundColor: '#5a4a3e',
+        padding: { x: 18, y: 10 },
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
-
     let busy = false;
     const refresh = () => {
-      statusText.setText(labels[cloudStatus()] ?? '');
+      if (!status.active) return;
+      status.setText(labels[cloudStatus()] ?? '');
       const account = linkedAccount();
-      linkButton.setText(account ? `✅ ${account}` : '🔗 구글 계정 연결 (기기 바꿔도 기록 유지)');
-      linkButton.setVisible(cloudStatus() !== 'offline' && cloudStatus() !== 'connecting');
+      link.setText(account ? `✅ ${account}` : '🔗 구글 계정 연결 (기기 바꿔도 기록 유지)');
+      link.setVisible(cloudStatus() !== 'offline' && cloudStatus() !== 'connecting');
     };
-    linkButton.on('pointerup', async () => {
+    link.on('pointerup', async () => {
       if (busy || linkedAccount()) return;
       busy = true;
-      statusText.setText('🔗 구글 로그인 창을 확인하세요');
+      status.setText('🔗 구글 로그인 창을 확인하세요');
       const message = await linkGoogle();
       busy = false;
       refresh();
-      statusText.setText(message);
+      if (status.active) status.setText(message);
     });
-
     refresh();
-    const off = onCloudChange((event) => {
-      if (event === 'pulled') this.scene.restart(); // 클라우드 기록을 받아 왔으면 팁과 별을 다시 그린다
-      else refresh();
-    });
-    this.events.once('shutdown', off);
+    const off = onCloudChange(refresh);
+    parts.push(status, link);
+
+    parts.push(
+      this.add.text(centerX, centerY + 290, 'v0.10 · 개발 중', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' }).setOrigin(0.5),
+    );
+    const close = () => {
+      off();
+      parts.forEach((p) => p.destroy());
+    };
+    parts.push(createButton(this, centerX, centerY + 345, 260, 80, '닫기', close, { fontSize: 30 }));
+    for (const p of parts) p.setDepth(20);
   }
 
   // 🍽️ 오늘의 특선 안내 창: 오늘의 주방과 규칙을 보여 주고 시작한다

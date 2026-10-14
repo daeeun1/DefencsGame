@@ -884,7 +884,7 @@ export default class GameScene extends Phaser.Scene {
           this.petChef(drag.chef);
         }
       });
-    } else if (pointer.worldY < this.layout.log.y) {
+    } else if (pointer.worldY < this.layout.info.y) {
       this.selectChef(null); // 빈 곳을 누르면 선택 해제
     }
   }
@@ -1075,52 +1075,47 @@ export default class GameScene extends Phaser.Scene {
     this.selectRing.strokeEllipse(chef.x, chef.y + 26, 112, 50);
   }
 
-  // 아래 패널 왼쪽 카드: 고른 유닛의 정보
+  // 정보 줄: 고른 유닛의 정보 (없으면 마지막 알림)
   updateCard() {
     const chef = this.selectedChef;
-    const card = this.card;
-    card.icon.clear();
+    const info = this.info;
+    const showing = Boolean(chef);
+    this.logText.setVisible(!showing);
+    for (const part of [info.emoji, info.title, info.detail, this.sellButton]) part.setVisible(showing);
     if (!chef) {
-      card.emoji.setText('');
-      card.tier.setText('').setVisible(false);
-      card.name.setText('');
-      card.role.setText('');
-      card.stats.setText('');
-      card.help.setVisible(true);
+      if (this.lastLog) this.logText.setText(this.lastLog.message).setColor(this.lastLog.color);
       return;
     }
-    card.help.setVisible(false);
 
     const s = chef.stats;
     const method = METHODS[s.method];
-    const tierColor = TIERS[s.tier].color;
-    card.icon.fillStyle(0x14171c, 1);
-    card.icon.fillRoundedRect(card.iconX, card.iconY, card.iconSize, card.iconSize, 14);
-    card.icon.lineStyle(5, tierColor, 1);
-    card.icon.strokeRoundedRect(card.iconX, card.iconY, card.iconSize, card.iconSize, 14);
-    card.emoji.setText(s.emoji);
-    card.tier.setText(TIERS[s.tier].name).setBackgroundColor(colorToHex(tierColor)).setVisible(true);
-    card.name.setText(s.name);
-    // 짧은 화면: 등급 표시 오른쪽에 이름을 붙인다
-    if (card.compact) card.name.setPosition(card.tier.x + card.tier.width + 8, card.tier.y + 3);
-    const line = LINES.includes(s.method) ? `${method.emoji} ${method.name} 줄 · ` : '';
-    card.role.setText(`${line}${s.ability ?? method.role}`);
+    info.emoji.setText(s.emoji);
+    const line = LINES.includes(s.method) ? ` · ${method.emoji} ${method.name} 줄` : '';
+    info.title.setText(`${s.name}${line}`);
+    info.title.setColor(colorToHex(TIERS[s.tier].color === 0xb8b8b8 ? 0xfff8ec : TIERS[s.tier].color));
 
-    const lines = [];
+    const parts = [TIERS[s.tier].name];
     if (s.method === 'buff') {
-      lines.push(`주변 공격 속도 +${Math.round(s.buff.attackSpeed * 100)}%`);
+      parts.push(`주변 공격 속도 +${Math.round(s.buff.attackSpeed * 100)}%`);
     } else {
-      const power = Math.round(s.damage * this.powerMultiplier(s, chef));
-      lines.push(card.compact ? `공격력 ${power} · ${s.interval}초마다` : `공격력  ${power}`);
-      if (!card.compact) lines.push(`공격 간격  ${s.interval}초`);
+      parts.push(`공격 ${Math.round(s.damage * this.powerMultiplier(s, chef))}`);
+      parts.push(`${s.interval}초`);
       const strong = Object.values(ORDER_TYPES).filter((o) => !o.boss && o.weakness === s.method);
-      if (s.method === 'all') lines.push('모든 주문에 강함');
-      else if (strong.length > 0) lines.push(`강함  ${strong.map((o) => o.emoji).join(' ')}`);
+      if (s.method === 'all') parts.push('모두 강함');
+      else if (strong.length > 0) parts.push(`강함 ${strong.map((o) => o.emoji).join('')}`);
     }
+    if (s.ability) parts.push(s.ability);
     const sets = SETS.filter((set) => chef.sets?.has(set.id)).map((set) => set.emoji);
     if (chef.fullCourse) sets.push(FULL_COURSE.emoji);
-    if (sets.length > 0) lines.push(`세트  ${sets.join(' ')}`);
-    card.stats.setText(lines.join('\n'));
+    if (sets.length > 0) parts.push(`세트 ${sets.join('')}`);
+    info.detail.setText(parts.join(' · '));
+    // 판매 버튼과 겹치지 않게 너무 길면 줄인다
+    const maxWidth = GAME_WIDTH - 104 - 80 - 96 - 10;
+    info.detail.setFontSize(18);
+    if (info.detail.width > maxWidth) info.detail.setFontSize(Math.floor((18 * maxWidth) / info.detail.width));
+    info.title.setFontSize(24);
+    if (info.title.width > maxWidth) info.title.setFontSize(Math.floor((24 * maxWidth) / info.title.width));
+    this.updateHud();
   }
 
   // ───────── 게임 끝 ─────────
@@ -1319,7 +1314,7 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
 
     // 남은 시간: 동그라미가 줄어든다. VIP 손님이 오면 빨간 "인내심"
-    this.timerX = 250;
+    this.timerX = 222;
     this.timerY = cy;
     this.timerRadius = Math.round(hud.h * 0.34);
     this.timerRing = this.add.graphics();
@@ -1328,9 +1323,9 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 골드
-    this.add.text(352, cy, '🪙', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(hud.h * 0.34)}px` }).setOrigin(0.5);
+    this.add.text(305, cy, '🪙', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(hud.h * 0.34)}px` }).setOrigin(0.5);
     this.hudGold = this.add
-      .text(388, cy + 2, '', { fontFamily: FONT, fontSize: `${Math.round(hud.h * 0.36)}px`, fontStyle: 'bold', color: COLORS.gold })
+      .text(338, cy + 2, '', { fontFamily: FONT, fontSize: `${Math.round(hud.h * 0.36)}px`, fontStyle: 'bold', color: COLORS.gold })
       .setOrigin(0, 0.5);
 
     // 일시 정지 버튼
@@ -1352,6 +1347,27 @@ export default class GameScene extends Phaser.Scene {
       if (this.isOver) return;
       sfx.click();
       this.setPaused(true);
+    });
+
+    // 배속 버튼 (일시 정지 왼쪽): 누를 때마다 1 → 2 → 3배속
+    const speedBox = this.add.graphics();
+    speedBox.fillStyle(0x3f9a4a, 1);
+    speedBox.fillRoundedRect(-size / 2, -size / 2, size, size, 14);
+    speedBox.lineStyle(5, COLORS.outline, 1);
+    speedBox.strokeRoundedRect(-size / 2, -size / 2, size, size, 14);
+    this.speedLabel = this.add
+      .text(0, 0, '', { fontFamily: FONT, fontSize: `${Math.round(size * 0.3)}px`, fontStyle: 'bold', color: COLORS.text, align: 'center' })
+      .setOrigin(0.5);
+    const speedButton = this.add
+      .container(px - size - 12, cy, [speedBox, this.speedLabel])
+      .setSize(size, size)
+      .setInteractive({ useHandCursor: true });
+    speedButton.on('pointerdown', () => speedButton.setScale(0.92));
+    speedButton.on('pointerout', () => speedButton.setScale(1));
+    speedButton.on('pointerup', () => {
+      speedButton.setScale(1);
+      sfx.click();
+      this.toggleSpeed();
     });
 
     // 레일 게이지: 레일 위 주문이 한도에 가까울수록 초록 → 노랑 → 빨강
@@ -1418,21 +1434,22 @@ export default class GameScene extends Phaser.Scene {
     this.summonButton.setSub(full ? '자리 없음' : `${cost}골드`);
     this.summonButton.setEnabled(!this.isOver && !full && this.gold >= cost);
 
-    const selected = this.selectedChef;
-    if (!selected) this.sellButton.setSub('고르세요').setEnabled(false);
-    else if (!this.canSell(selected)) this.sellButton.setSub('신화는 안 돼요').setEnabled(false);
-    else this.sellButton.setSub(`+${this.sellPriceOf(selected)}`).setEnabled(!this.isOver);
+    if (this.selectedChef) {
+      const chef = this.selectedChef;
+      if (!this.canSell(chef)) this.sellButton.setLabel('판매 불가').setEnabled(false);
+      else this.sellButton.setLabel(`💰 +${this.sellPriceOf(chef)}`).setEnabled(!this.isOver);
+    }
 
     if (this.upgradePanel.isOpen) this.upgradePanel.refresh();
     if (this.recipePanel.isOpen) this.recipePanel.refresh();
 
-    // 만들 수 있는 신화 레시피가 있으면 레시피 버튼에 금색 테두리 + 반짝임
+    // 만들 수 있는 신화 레시피가 있을 때만 판 위에 반짝이는 레시피 버튼이 나온다
     const ready = !this.isOver && this.canCraftAny();
     if (ready !== this.recipeReady) {
       this.recipeReady = ready;
-      this.recipeButton.setLit(ready).setSub(ready ? '만들 수 있어요!' : '');
+      this.recipeButton.setVisible(ready);
       this.recipeBlink.paused = !ready;
-      if (!ready) this.recipeButton.setAlpha(1);
+      if (ready) this.log('📜 신화 레시피를 만들 수 있어요!', COLORS.gold);
     }
   }
 
@@ -1529,117 +1546,105 @@ export default class GameScene extends Phaser.Scene {
     g.strokePath();
   }
 
-  // ───────── 아래: 알림 한 줄과 명령 패널 ─────────
+  // ───────── 아래: 정보 줄과 큰 명령 버튼 ─────────
 
   createControls() {
-    const { log, panel } = this.layout;
+    const { info, panel } = this.layout;
 
-    // 알림 한 줄: 뽑기, 합성, 판매 결과가 여기에 나온다
-    const logBox = this.add.graphics();
-    logBox.fillStyle(COLORS.outline, 0.9);
-    logBox.fillRoundedRect(12, log.y, GAME_WIDTH - 24, log.h, 12);
+    // 정보 줄: 평소에는 알림(뽑기, 합성 결과), 유닛을 누르면 그 유닛의 정보와 판매 버튼
+    const infoBox = this.add.graphics();
+    infoBox.fillStyle(COLORS.outline, 0.9);
+    infoBox.fillRoundedRect(12, info.y, GAME_WIDTH - 24, info.h, 14);
+    const cy = info.y + info.h / 2;
+    const small = info.h < 76;
     this.logText = this.add
-      .text(30, log.y + log.h / 2, '', { fontFamily: FONT, fontSize: `${Math.min(24, Math.round(log.h * 0.5))}px`, color: COLORS.text })
+      .text(32, cy, '', { fontFamily: FONT, fontSize: small ? '21px' : '24px', color: COLORS.text, wordWrap: { width: GAME_WIDTH - 64 } })
       .setOrigin(0, 0.5);
-    this.log('💬 같은 것끼리 끌어다 놓으면 다음 단계로 합성!', '#b9a48f');
-
-    // 패널 바탕
-    const box = this.add.graphics();
-    box.fillStyle(COLORS.panel, 1);
-    box.fillRoundedRect(12, panel.y, GAME_WIDTH - 24, panel.h, 18);
-    box.lineStyle(6, COLORS.outline, 1);
-    box.strokeRoundedRect(12, panel.y, GAME_WIDTH - 24, panel.h, 18);
-
-    this.createCard(26, panel.y + 14, 300, panel.h - 28);
-
-    // 명령 버튼 3 x 2
-    const left = 340;
-    const gap = 10;
-    const width = (GAME_WIDTH - 26 - left - gap * 2) / 3;
-    const height = Math.min(124, (panel.h - 28 - gap - 6) / 2);
-    const top = panel.y + (panel.h - (height * 2 + gap + 6)) / 2;
-    const at = (col, row) => [left + col * (width + gap) + width / 2, top + row * (height + gap) + height / 2];
-    const make = (col, row, look, onClick) => createCommandButton(this, ...at(col, row), width, height, look, onClick);
-
-    this.summonButton = make(0, 0, { emoji: '🎲', label: '뽑기', color: 0xe85d3a }, () => this.summon());
-    make(1, 0, { emoji: '⬆️', label: '강화', color: 0x3f7fd0 }, () => this.upgradePanel.open());
-    this.sellButton = make(2, 0, { emoji: '💰', label: '판매', color: 0x7d8594 }, () => this.sellSelected());
-    this.recipeButton = make(0, 1, { emoji: '📜', label: '레시피', color: 0x8e4fc0 }, () => {
-      if (!this.isOver) this.recipePanel.open();
+    this.info = {
+      emoji: this.add.text(54, cy, '', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(info.h * 0.62)}px` }).setOrigin(0.5),
+      title: this.add
+        .text(96, cy - info.h * 0.2, '', { fontFamily: FONT, fontSize: small ? '21px' : '24px', fontStyle: 'bold', color: COLORS.text })
+        .setOrigin(0, 0.5),
+      detail: this.add
+        .text(96, cy + info.h * 0.22, '', { fontFamily: FONT, fontSize: small ? '16px' : '18px', color: '#b9c2cf' })
+        .setOrigin(0, 0.5),
+    };
+    this.sellButton = createButton(this, GAME_WIDTH - 104, cy, 160, info.h - 16, '', () => this.sellSelected(), {
+      fontSize: 24,
+      color: 0xc99a2e,
     });
-    this.speedButton = make(1, 1, { emoji: '⏩', label: '', color: 0x3f9a4a }, () => this.toggleSpeed());
-    make(2, 1, { emoji: '🔄', label: '자동 합성', color: 0xc77d2e }, () => this.autoMerge());
+    this.log('💬 같은 것끼리 겹치면 합성, 다른 줄끼리 붙이면 세트!', '#b9a48f');
+
+    // 큰 명령 버튼 3개: 뽑기(가장 크게) / 자동 합성 / 강화
+    const gap = 12;
+    const height = Math.min(150, panel.h);
+    const top = panel.y + (panel.h - height) / 2;
+    const left = 12;
+    const total = GAME_WIDTH - 24 - gap * 2;
+    const summonWidth = Math.round(total * 0.44);
+    const sideWidth = (total - summonWidth) / 2;
+    const cyButtons = top + height / 2;
+    this.summonButton = createCommandButton(
+      this,
+      left + summonWidth / 2,
+      cyButtons,
+      summonWidth,
+      height,
+      { emoji: '🎲', label: '뽑기', color: 0xe85d3a },
+      () => this.summon(),
+    );
+    createCommandButton(
+      this,
+      left + summonWidth + gap + sideWidth / 2,
+      cyButtons,
+      sideWidth,
+      height,
+      { emoji: '🔄', label: '자동 합성', color: 0xc77d2e },
+      () => this.autoMerge(),
+    );
+    createCommandButton(
+      this,
+      left + summonWidth + gap * 2 + sideWidth * 1.5,
+      cyButtons,
+      sideWidth,
+      height,
+      { emoji: '⬆️', label: '강화', color: 0x3f7fd0 },
+      () => this.upgradePanel.open(),
+    );
     this.updateSpeedButton();
 
+    // 신화 레시피를 만들 수 있을 때만 판 아래쪽 레일 위에 뜨는 반짝이는 버튼
+    this.recipeButton = createButton(
+      this,
+      GAME_WIDTH / 2,
+      this.boardY + (BOARD_ROWS - 0.5) * TILE,
+      340,
+      76,
+      '📜 신화 레시피!',
+      () => {
+        if (!this.isOver) this.recipePanel.open();
+      },
+      { fontSize: 28, color: 0x8e4fc0 },
+    );
+    this.recipeButton.setDepth(6).setVisible(false);
     this.recipeReady = false;
-    this.recipeBlink = this.tweens.add({ targets: this.recipeButton, alpha: 0.55, duration: 450, yoyo: true, repeat: -1, paused: true });
+    this.recipeBlink = this.tweens.add({
+      targets: this.recipeButton,
+      scale: 1.08,
+      duration: 450,
+      yoyo: true,
+      repeat: -1,
+      paused: true,
+    });
 
     this.createPauseMenu();
     this.selectChef(null);
   }
 
-  // 패널 왼쪽 카드: 고른 유닛의 그림, 등급, 이름, 능력치
-  createCard(x, y, width, height) {
-    const bg = this.add.graphics();
-    bg.fillStyle(COLORS.panelDark, 1);
-    bg.fillRoundedRect(x, y, width, height, 14);
-
-    const compact = height < 200; // 화면이 짧으면 능력치를 줄여서 보여 준다
-    const iconSize = compact ? Math.min(64, height - 70) : Math.min(104, Math.round(height * 0.36));
-    const iconX = x + 12;
-    const iconY = y + 12;
-    const textX = iconX + iconSize + 14;
-    const card = {
-      compact,
-      iconX,
-      iconY,
-      iconSize,
-      icon: this.add.graphics(),
-      emoji: this.add
-        .text(iconX + iconSize / 2, iconY + iconSize / 2, '', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(iconSize * 0.6)}px` })
-        .setOrigin(0.5),
-      tier: this.add.text(textX, iconY + 2, '', {
-        fontFamily: FONT,
-        fontSize: '18px',
-        fontStyle: 'bold',
-        color: COLORS.text,
-        padding: { x: 10, y: 4 },
-      }),
-      name: this.add.text(textX, iconY + (compact ? 30 : 38), '', {
-        fontFamily: FONT,
-        fontSize: compact ? '19px' : '24px',
-        fontStyle: 'bold',
-        color: COLORS.text,
-        wordWrap: compact ? undefined : { width: x + width - textX - 8, useAdvancedWrap: true },
-      }),
-      role: this.add.text(compact ? textX : iconX, compact ? iconY + 36 : iconY + iconSize + 12, '', {
-        fontFamily: FONT,
-        fontSize: '17px',
-        color: '#b9c2cf',
-        wordWrap: { width: compact ? x + width - textX - 8 : width - 24, useAdvancedWrap: true },
-      }),
-      stats: this.add.text(iconX, compact ? iconY + iconSize + 10 : iconY + iconSize + 44, '', {
-        fontFamily: FONT,
-        fontSize: compact ? '17px' : '20px',
-        color: COLORS.text,
-        lineSpacing: compact ? 3 : 8,
-      }),
-      help: this.add
-        .text(x + width / 2, y + height / 2, '유닛을 누르면 정보가 보여요\n\n같은 것끼리 겹치면 → 합성\n다른 줄끼리 붙이면 → 세트', {
-          fontFamily: FONT,
-          fontSize: compact ? '17px' : '21px',
-          color: '#9aa4b2',
-          align: 'center',
-          lineSpacing: 4,
-        })
-        .setOrigin(0.5),
-    };
-    this.card = card;
-  }
-
-  // 알림 한 줄 바꾸기
+  // 알림 바꾸기 (유닛을 고르고 있는 동안에는 기억만 해 두었다가, 선택을 풀면 보여 준다)
   log(message, color = COLORS.text) {
-    if (!this.logText) return;
+    this.lastLog = { message, color };
+    if (!this.logText || this.selectedChef) return;
     this.logText.setText(message).setColor(color);
     this.logText.setAlpha(0.4);
     this.tweens.add({ targets: this.logText, alpha: 1, duration: 200 });
@@ -1653,27 +1658,32 @@ export default class GameScene extends Phaser.Scene {
     const shade = this.add.rectangle(0, 0, GAME_WIDTH, this.screenHeight, 0x000000, 0.7).setOrigin(0).setInteractive();
     const box = this.add.graphics();
     box.fillStyle(COLORS.panel, 1);
-    box.fillRoundedRect(centerX - 260, centerY - 330, 520, 660, 24);
+    box.fillRoundedRect(centerX - 260, centerY - 390, 520, 780, 24);
     box.lineStyle(6, COLORS.outline, 1);
-    box.strokeRoundedRect(centerX - 260, centerY - 330, 520, 660, 24);
+    box.strokeRoundedRect(centerX - 260, centerY - 390, 520, 780, 24);
     const title = this.add
-      .text(centerX, centerY - 250, '⏸ 일시 정지', { fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: COLORS.text })
+      .text(centerX, centerY - 310, '⏸ 일시 정지', { fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
 
-    const resume = createButton(this, centerX, centerY - 120, 400, 100, '▶ 계속하기', () => this.setPaused(false), {
+    const resume = createButton(this, centerX, centerY - 190, 400, 100, '▶ 계속하기', () => this.setPaused(false), {
       color: 0x3f9a4a,
     });
-    const restart = createButton(this, centerX, centerY + 5, 400, 100, '🔄 다시 하기', () =>
+    // 신화 레시피와 세트 메뉴 안내 (게임은 다시 진행되면서 창이 열린다)
+    const recipes = createButton(this, centerX, centerY - 70, 400, 100, '📜 레시피 · 세트', () => {
+      this.setPaused(false);
+      this.recipePanel.open();
+    }, { color: 0x8e4fc0 });
+    const restart = createButton(this, centerX, centerY + 50, 400, 100, '🔄 다시 하기', () =>
       this.restartRun(),
     );
-    const home = createButton(this, centerX, centerY + 130, 400, 100, '🏠 처음으로', () => this.scene.start('Title'), {
+    const home = createButton(this, centerX, centerY + 170, 400, 100, '🏠 처음으로', () => this.scene.start('Title'), {
       color: 0x7d8594,
     });
 
     // 소리 한 번에 켜고 끄기 (효과음 + 음악)
     const soundLabel = () => (isOn('sfx') || isOn('music') ? '🔊 소리 켬' : '🔇 소리 끔');
     const sound = this.add
-      .text(centerX, centerY + 250, soundLabel(), {
+      .text(centerX, centerY + 300, soundLabel(), {
         fontFamily: FONT,
         fontSize: '28px',
         color: COLORS.text,
@@ -1689,7 +1699,7 @@ export default class GameScene extends Phaser.Scene {
       sound.setText(soundLabel());
     });
 
-    this.pauseMenu = this.add.container(0, 0, [shade, box, title, resume, restart, home, sound]).setDepth(30).setVisible(false);
+    this.pauseMenu = this.add.container(0, 0, [shade, box, title, resume, recipes, restart, home, sound]).setDepth(30).setVisible(false);
   }
 
   // 일시 정지 켜고 끄기: 게임 시간, 움직임(트윈), 예약된 일이 모두 멈춘다
@@ -1718,7 +1728,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   updateSpeedButton() {
-    this.speedButton.setLabel(`${this.gameSpeed}배속`);
+    this.speedLabel.setText(`⏩\n${this.gameSpeed}x`);
   }
 
   // 판 가운데에 잠깐 나타났다 사라지는 큰 글씨 (예: "웨이브 3")

@@ -11,27 +11,27 @@ export const BOARD_COLS = 6; // 레일 포함 가로 칸 수
 export const BOARD_ROWS = 9; // 레일 포함 세로 칸 수
 export const BOARD_X = (GAME_WIDTH - BOARD_COLS * TILE) / 2; // 판 왼쪽 x
 
-// 게임 화면 배치: 위 정보줄 → 레일 게이지 → 판 → 알림 한 줄 → 아래 명령 패널.
-// 휴대폰 화면이 길수록(1280 → 1560) 정보줄과 패널이 넉넉해진다. 판(900)은 크기가 그대로다.
+// 게임 화면 배치: 위 정보줄 → 레일 게이지 → 판 → 정보 줄 → 큰 명령 버튼 3개.
+// 휴대폰 화면이 길수록(1280 → 1560) 정보줄과 버튼이 넉넉해진다. 판(900)은 크기가 그대로다.
 export function gameLayout(screenHeight) {
   const t = Math.min(1, Math.max(0, (screenHeight - GAME_HEIGHT) / 280));
   const lerp = (a, b) => Math.round(a + (b - a) * t);
-  const hud = { y: 10, h: lerp(92, 128) };
-  const gauge = { y: hud.y + hud.h + lerp(8, 12), h: lerp(32, 46) };
+  const hud = { y: 10, h: lerp(92, 120) };
+  const gauge = { y: hud.y + hud.h + lerp(8, 12), h: lerp(32, 44) };
   const boardY = gauge.y + gauge.h + lerp(12, 18);
-  const log = { y: boardY + BOARD_ROWS * TILE + lerp(10, 16), h: lerp(34, 50) };
-  const panel = { y: log.y + log.h + lerp(8, 12), h: 0 };
+  const info = { y: boardY + BOARD_ROWS * TILE + lerp(10, 16), h: lerp(66, 84) };
+  const panel = { y: info.y + info.h + lerp(8, 14), h: 0 };
   panel.h = screenHeight - panel.y - 10;
 
-  // 아주 긴 화면이면 패널은 340까지만 키우고, 남는 높이만큼 전체를 가운데로 내린다
-  const maxPanel = 340;
+  // 아주 긴 화면이면 버튼 영역은 170까지만 키우고, 남는 높이만큼 전체를 가운데로 내린다
+  const maxPanel = 170;
   if (panel.h > maxPanel) {
     const shift = Math.floor((panel.h - maxPanel) / 2);
-    for (const part of [hud, gauge, log, panel]) part.y += shift;
+    for (const part of [hud, gauge, info, panel]) part.y += shift;
     panel.h = maxPanel;
-    return { hud, gauge, boardY: boardY + shift, log, panel };
+    return { hud, gauge, boardY: boardY + shift, info, panel };
   }
-  return { hud, gauge, boardY, log, panel };
+  return { hud, gauge, boardY, info, panel };
 }
 
 export const COLORS = {
