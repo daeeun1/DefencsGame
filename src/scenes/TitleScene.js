@@ -36,10 +36,10 @@ export default class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: cake, angle: 20, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 200 });
 
     this.add
-      .text(centerX, top + 405, '주방 디펜스', { fontFamily: FONT, fontSize: '84px', fontStyle: 'bold', color: COLORS.text })
+      .text(centerX, top + 405, '쿡쿡!', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
     this.add
-      .text(centerX, top + 485, '레일 위 주문을 막아라!', { fontFamily: FONT, fontSize: '32px', color: COLORS.gold })
+      .text(centerX, top + 500, '레일 위 주문을 막아라!', { fontFamily: FONT, fontSize: '32px', color: COLORS.gold })
       .setOrigin(0.5);
     this.add
       .text(centerX, top + 570, `🪙 팁 ${save.tips}    ⭐ 별 ${totalStars()}`, {
