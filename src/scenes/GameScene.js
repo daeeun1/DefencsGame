@@ -15,7 +15,6 @@ import {
   TOTAL_WAVES,
   WAVE_DURATION,
   RAIL_LIMIT,
-  RAIL_WARNING,
   START_GOLD,
   SPAWN_SPREAD,
   SUMMON_ODDS,
@@ -38,6 +37,21 @@ import Chef from '../objects/Chef.js';
 import Projectile from '../objects/Projectile.js';
 import UpgradePanel from '../panels/UpgradePanel.js';
 import RecipePanel from '../panels/RecipePanel.js';
+import { getSave, writeSave, totalStars, shopLevel, codexLevel, discover } from '../save.js';
+import {
+  SHOP_ITEMS,
+  STAR_RULES,
+  TIPS_PER_ORDER,
+  TIPS_PER_STAR,
+  DEFAULT_KITCHEN,
+  RECIPE_UNLOCK_STARS,
+  CODEX_DAMAGE_PER_LEVEL,
+} from '../data/progress.js';
+
+// 가게 강화 효과 = 레벨 × 한 단계당 효과
+function shopBonus(id) {
+  return shopLevel(id) * SHOP_ITEMS.find((item) => item.id === id).per;
+}
 
 // 배속 버튼을 누를 때마다 이 순서로 바뀐다
 const SPEEDS = [1, 2, 3];
@@ -71,7 +85,12 @@ export default class GameScene extends Phaser.Scene {
     this.chefs = [];
     this.projectiles = [];
     this.freezeTimeLeft = 0; // 디저트 마녀가 레일을 멈춘 남은 시간
-    this.gold = START_GOLD;
+    // 가게 강화(영구 성장) 효과를 이번 판에 적용
+    this.gold = START_GOLD + shopBonus('startGold');
+    this.railLimit = RAIL_LIMIT + shopBonus('railCapacity');
+    this.bossPatience = BOSS_PATIENCE + shopBonus('patience');
+    this.ordersServed = 0; // 이번 판에 처리한 주문 수 (팁 계산용)
+    this.bossesDefeated = 0; // 이번 판에 만족시킨 VIP 손님 수 (= 별)
     this.summonCount = 0; // 지금까지 뽑은 횟수 (뽑기 비용 계산용)
     this.upgradeLevels = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }; // 등급별 강화 레벨
     this.selectedChef = null;
@@ -95,6 +114,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.recipePanel = new RecipePanel(this, {
       hasChef: (id) => this.chefs.some((c) => c.stats.id === id),
+      isUnlocked: (recipe) => this.isRecipeUnlocked(recipe),
       onCraft: (recipe) => this.craft(recipe),
     });
 
@@ -147,7 +167,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 5) 패배 / 다음 웨이브 / 클리어 판정
     if (this.isOver) return; // 보스를 처치해서 이번 프레임에 클리어했을 수 있다
-    if (this.orders.length >= RAIL_LIMIT) {
+    if (this.orders.length >= this.railLimit) {
       this.endGame('rail');
     } else if (this.waveTimeLeft <= 0) {
       if (this.boss) this.endGame('boss'); // 인내심이 다 떨어졌다
@@ -174,7 +194,7 @@ export default class GameScene extends Phaser.Scene {
 
     if (bossKey) {
       // 보스 웨이브: 제한 시간이 인내심으로 바뀌고, 보스가 맨 먼저 나온다
-      this.waveTimeLeft = BOSS_PATIENCE;
+      this.waveTimeLeft = this.bossPatience;
       this.spawnQueue.unshift({ at: 0, type: bossKey });
       this.showBanner(`⚠ VIP 손님 등장!\n${ORDER_TYPES[bossKey].emoji} ${ORDER_TYPES[bossKey].name}`, COLORS.danger, 44);
     } else {
@@ -223,6 +243,7 @@ export default class GameScene extends Phaser.Scene {
   // 주문을 처리했을 때: 골드를 받고 레일에서 사라진다
   completeOrder(order) {
     this.gold += order.reward;
+    this.ordersServed += 1;
     this.orders = this.orders.filter((o) => o !== order);
     if (order.reward > 0) this.floatText(order.x, order.y - 30, `+${order.reward}`, COLORS.gold);
 
@@ -246,6 +267,7 @@ export default class GameScene extends Phaser.Scene {
   // VIP 손님을 처리했을 때: 마지막 보스면 클리어, 아니면 바로 다음 웨이브
   bossDefeated(boss) {
     this.boss = null;
+    this.bossesDefeated += 1;
     this.showBanner(`🎉 ${boss.type.name} 만족!`, COLORS.gold, 44);
     if (this.wave >= TOTAL_WAVES) {
       this.endGame('clear');
@@ -279,7 +301,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 요리사 뽑기: 골드를 내고 무작위 등급, 무작위 요리사를 빈 칸에 놓는다
   summon() {
-    const cost = summonCost(this.summonCount);
+    const cost = this.currentSummonCost();
     const empty = this.emptySlots();
     if (this.isOver || this.gold < cost || empty.length === 0) return;
 
@@ -309,7 +331,7 @@ export default class GameScene extends Phaser.Scene {
     // 지속 피해와 감속은 목표에게 먼저 건다 (끓이기, 차갑게, 요리의 신)
     if (!target.dead) {
       const bonus = this.weaknessMultiplier(stats, target);
-      if (stats.dot) target.applyDot(stats.dot.dps * bonus * this.upgradeMultiplier(stats.tier), stats.dot.duration);
+      if (stats.dot) target.applyDot(stats.dot.dps * bonus * this.powerMultiplier(stats), stats.dot.duration);
       if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration);
     }
 
@@ -338,7 +360,17 @@ export default class GameScene extends Phaser.Scene {
 
   // 요리사가 이 주문에 주는 피해: 기본 공격력 × 강화 배율 × 약점이면 1.5배
   damageAgainst(stats, order) {
-    return stats.damage * this.upgradeMultiplier(stats.tier) * this.weaknessMultiplier(stats, order);
+    return stats.damage * this.powerMultiplier(stats) * this.weaknessMultiplier(stats, order);
+  }
+
+  // 공격력 배율: 이번 판의 등급별 강화 × 도감 레벨(영구)
+  powerMultiplier(stats) {
+    return this.upgradeMultiplier(stats.tier) * (1 + codexLevel(stats.id) * CODEX_DAMAGE_PER_LEVEL);
+  }
+
+  // 뽑기 비용: 기본 비용에서 가게 강화(단골 인력소)만큼 할인
+  currentSummonCost() {
+    return summonCost(this.summonCount) - shopBonus('summonDiscount');
   }
 
   // 약점이면 1.5배. 까다로운 주문은 약점이 아닌 조리법이면 절반.
@@ -376,14 +408,19 @@ export default class GameScene extends Phaser.Scene {
     return used;
   }
 
+  // 별을 충분히 모아서 레시피가 열려 있는지
+  isRecipeUnlocked(recipe) {
+    return totalStars() >= RECIPE_UNLOCK_STARS[recipe.result];
+  }
+
   canCraftAny() {
-    return RECIPES.some((r) => this.findIngredients(r));
+    return RECIPES.some((r) => this.isRecipeUnlocked(r) && this.findIngredients(r));
   }
 
   // 신화 만들기: 재료 요리사들이 사라지고, 첫 번째 재료가 있던 칸에 신화 요리사가 생긴다
   craft(recipe) {
     const ingredients = this.findIngredients(recipe);
-    if (this.isOver || !ingredients) return;
+    if (this.isOver || !ingredients || !this.isRecipeUnlocked(recipe)) return;
 
     const slot = ingredients[0].slot;
     for (const chef of ingredients) this.removeChef(chef);
@@ -514,6 +551,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   addChef(data, slot) {
+    if (discover(data.id)) this.floatText(slot.x, slot.y + 45, '📖 도감 등록!', COLORS.gold, 20);
     const chef = new Chef(this, data, slot);
     slot.chef = chef;
     this.chefLayer.add(chef);
@@ -569,31 +607,76 @@ export default class GameScene extends Phaser.Scene {
     this.recipePanel.close();
     this.updateHud();
 
+    const rewards = this.giveRewards();
+
     const centerX = GAME_WIDTH / 2;
     const centerY = this.screenHeight / 2;
+    const depth = 11;
+    const text = (y, message, size, color, bold = false) =>
+      this.add
+        .text(centerX, y, message, { fontFamily: FONT, fontSize: `${size}px`, fontStyle: bold ? 'bold' : '', color, align: 'center' })
+        .setOrigin(0.5)
+        .setDepth(depth);
 
-    this.add.rectangle(0, 0, GAME_WIDTH, this.screenHeight, 0x000000, 0.7).setOrigin(0).setDepth(10);
+    this.add.rectangle(0, 0, GAME_WIDTH, this.screenHeight, 0x000000, 0.75).setOrigin(0).setDepth(10);
 
-    const title = cleared ? '🎉 영업 성공!' : '😵 가게가 망했어요...';
     const details = {
       clear: `${ORDER_TYPES.king.name}까지 만족시켰어요!`,
-      rail: `${this.wave}웨이브에서 레일에 주문이 ${RAIL_LIMIT}개 쌓였어요`,
+      rail: `${this.wave}웨이브에서 레일에 주문이 ${this.railLimit}개 쌓였어요`,
       boss: `${this.boss ? this.boss.type.name : 'VIP 손님'}이(가) 화가 나서 떠났어요`,
     };
-    const detail = details[reason];
+    text(centerY - 360, cleared ? '🎉 영업 성공!' : '😵 가게가 망했어요...', 58, COLORS.text, true);
+    text(centerY - 290, details[reason], 26, '#d8c8b4');
 
-    this.add
-      .text(centerX, centerY - 160, title, { fontFamily: FONT, fontSize: '60px', fontStyle: 'bold', color: COLORS.text })
-      .setOrigin(0.5)
-      .setDepth(11);
-    this.add
-      .text(centerX, centerY - 80, detail, { fontFamily: FONT, fontSize: '28px', color: COLORS.gold })
-      .setOrigin(0.5)
-      .setDepth(11);
+    // 별 3개: 받은 별은 ⭐, 못 받은 별은 흐리게
+    for (let i = 0; i < 3; i++) {
+      const star = text(centerY - 190, '⭐', 84, COLORS.text).setX(centerX + (i - 1) * 110);
+      if (i >= rewards.stars) star.setAlpha(0.2);
+      else {
+        star.setScale(0);
+        this.tweens.add({ targets: star, scale: 1, delay: 300 + i * 250, duration: 300, ease: 'Back.Out' });
+      }
+    }
+    text(
+      centerY - 95,
+      STAR_RULES.map((rule, i) => `${i < rewards.stars ? '✅' : '⬜'} ${rule}`).join('\n'),
+      24,
+      COLORS.text,
+    ).setLineSpacing(6);
 
-    createButton(this, centerX, centerY + 40, 360, 100, '다시 하기', () => this.scene.restart()).setDepth(11);
-    createButton(this, centerX, centerY + 160, 360, 100, '처음으로', () => this.scene.start('Title')).setDepth(11);
+    let y = centerY + 20;
+    text(y, `🪙 팁 +${rewards.tips}  (주문 ${this.ordersServed}개 · 별 ${rewards.stars}개)`, 28, COLORS.gold, true);
+    if (rewards.newBest) text((y += 45), '🏆 새 최고 기록!', 28, COLORS.gold, true);
+    for (const name of rewards.unlocked) text((y += 45), `🔓 신화 레시피 해금: ${name}`, 26, '#ff8a8a', true);
+
+    createButton(this, centerX, centerY + 230, 360, 100, '다시 하기', () => this.scene.restart()).setDepth(depth);
+    createButton(this, centerX, centerY + 345, 360, 100, '처음으로', () => this.scene.start('Title')).setDepth(depth);
   }
+
+  // 판 끝 보상: 별과 팁을 계산해서 저장한다
+  giveRewards() {
+    const save = getSave();
+    const stars = Math.min(3, this.bossesDefeated);
+    const tips = this.ordersServed * TIPS_PER_ORDER + stars * TIPS_PER_STAR;
+
+    const starsBefore = totalStars();
+    const best = save.bestStars[DEFAULT_KITCHEN] ?? 0;
+    const newBest = stars > best;
+    if (newBest) save.bestStars[DEFAULT_KITCHEN] = stars;
+    save.tips += tips;
+    save.runs += 1;
+    writeSave();
+
+    // 이번 판으로 새로 열린 신화 레시피
+    const starsAfter = totalStars();
+    const unlocked = RECIPES.filter((r) => {
+      const need = RECIPE_UNLOCK_STARS[r.result];
+      return starsBefore < need && starsAfter >= need;
+    }).map((r) => chefById(r.result).name);
+
+    return { stars, tips, newBest, unlocked };
+  }
+
 
   // ───────── 화면 그리기 ─────────
 
@@ -642,11 +725,11 @@ export default class GameScene extends Phaser.Scene {
     // 보스가 있으면 "남은 시간" 대신 "인내심"을 빨간색으로
     this.hudLabels[1].setText(this.boss ? '😤 인내심' : '남은 시간');
     time.setColor(this.boss ? COLORS.danger : COLORS.text);
-    orders.setText(`${this.orders.length} / ${RAIL_LIMIT}`);
-    orders.setColor(this.orders.length >= RAIL_WARNING ? COLORS.danger : COLORS.text);
+    orders.setText(`${this.orders.length} / ${this.railLimit}`);
+    orders.setColor(this.orders.length >= this.railLimit * 0.75 ? COLORS.danger : COLORS.text);
     gold.setText(`${this.gold}`);
 
-    const cost = summonCost(this.summonCount);
+    const cost = this.currentSummonCost();
     const full = this.emptySlots().length === 0;
     this.summonButton.setLabel(full ? '🎲 자리가 없어요' : `🎲 요리사 뽑기\n${cost}골드`);
     this.summonButton.setEnabled(!this.isOver && !full && this.gold >= cost);

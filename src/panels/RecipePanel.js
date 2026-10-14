@@ -1,5 +1,6 @@
 import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { METHODS, RECIPES, chefById } from '../data/chefs.js';
+import { RECIPE_UNLOCK_STARS } from '../data/progress.js';
 import { createButton } from '../ui.js';
 
 const PANEL_WIDTH = 660;
@@ -9,10 +10,12 @@ const ROW_HEIGHT = 300;
 // 레시피마다 결과 요리사, 능력, 재료(갖췄으면 ✅, 없으면 ❌)와 "만들기" 버튼을 보여 준다.
 export default class RecipePanel {
   // hasChef(id): 판 위에 그 요리사가 있는지 알려 주는 함수
+  // isUnlocked(recipe): 별을 모아서 레시피가 열렸는지 알려 주는 함수
   // onCraft(recipe): 만들기 버튼을 눌렀을 때 부르는 함수
-  constructor(scene, { hasChef, onCraft }) {
+  constructor(scene, { hasChef, isUnlocked, onCraft }) {
     this.scene = scene;
     this.hasChef = hasChef;
+    this.isUnlocked = isUnlocked;
 
     const screenHeight = scene.scale.height;
     const panelHeight = 130 + RECIPES.length * ROW_HEIGHT + 120;
@@ -101,7 +104,10 @@ export default class RecipePanel {
         row.ingredientTexts[j].setText(`${have ? '✅' : '❌'} ${chef.name}`);
         row.ingredientTexts[j].setColor(have ? COLORS.text : '#8a7a6a');
       });
-      row.button.setEnabled(ready);
+      // 잠긴 레시피: 별이 모자라면 만들 수 없다
+      const unlocked = this.isUnlocked(row.recipe);
+      row.button.setLabel(unlocked ? '만들기' : `🔒 ⭐${RECIPE_UNLOCK_STARS[row.recipe.result]}개`);
+      row.button.setEnabled(unlocked && ready);
     }
   }
 }

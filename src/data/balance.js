@@ -3,7 +3,6 @@
 export const TOTAL_WAVES = 30; // 이 웨이브까지 버티면 클리어
 export const WAVE_DURATION = 15; // 웨이브 하나의 길이 (초)
 export const RAIL_LIMIT = 60; // 레일 위 주문이 이만큼 쌓이면 패배
-export const RAIL_WARNING = 45; // 이 이상이면 주문 수가 빨간색으로 표시
 export const START_GOLD = 100;
 
 export const BASE_SPEED = 130; // 주문의 기본 이동 속도 (화면 픽셀/초)

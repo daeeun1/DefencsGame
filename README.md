@@ -29,10 +29,12 @@ src/
   main.js             게임 시작점: 화면 크기, 장면 목록
   config.js           크기, 배치, 색상 같은 공용 값
   ui.js               버튼 같은 공용 화면 부품
+  save.js             영구 성장 기록 저장 (팁, 별, 강화, 도감)
   data/
     balance.js        웨이브 길이, 체력 증가율 같은 밸런스 숫자
     orders.js         주문(적) 종류와 능력치
-    chefs.js          요리사 목록, 등급, 조리법별 능력치
+    chefs.js          요리사 목록, 등급, 조리법별 능력치, 신화 레시피
+    progress.js       판 끝 보상, 가게 강화, 도감 숫자
   objects/
     Rail.js           회전 레일 경로 계산
     Order.js          레일 위를 도는 주문 하나 (감속, 지속 피해 포함)
@@ -42,6 +44,8 @@ src/
     UpgradePanel.js   등급별 강화 창
     RecipePanel.js    신화 레시피 창
   scenes/
-    TitleScene.js     첫 화면 (제목, 시작 버튼)
+    TitleScene.js     첫 화면 (제목, 팁과 별, 메뉴)
+    ShopScene.js      가게 강화 화면
+    CodexScene.js     요리사 도감 화면
     GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 합성, 강화, 승패 판정)
 ```
