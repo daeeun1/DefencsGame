@@ -60,7 +60,9 @@ import {
   TIPS_PER_STAR,
   RECIPE_UNLOCK_STARS,
   CODEX_DAMAGE_PER_LEVEL,
+  runScore,
 } from '../data/progress.js';
+import { submitScore } from '../cloud.js';
 
 // 가게 강화 효과 = 레벨 × 한 단계당 효과
 function shopBonus(id) {
@@ -1181,6 +1183,18 @@ export default class GameScene extends Phaser.Scene {
     text(y, `🪙 팁 +${rewards.tips}  (주문 ${this.ordersServed}개 · 별 ${rewards.stars}개${bonus})`, 26, COLORS.gold, true);
     if (rewards.newBest) text((y += 42), '🏆 새 최고 기록!', 26, COLORS.gold, true);
     for (const message of rewards.unlocked) text((y += 40), `🔓 ${message}`, 22, '#ff8a8a', true);
+
+    // 🏆 랭킹: 점수를 보여 주고, 클라우드에 올린 뒤 순위를 알려 준다
+    const result = { wave: this.wave, stars: rewards.stars, orders: this.ordersServed };
+    result.score = runScore(result);
+    text((y += 46), `🏆 점수 ${result.score}`, 28, COLORS.gold, true);
+    const rankText = text((y += 38), '랭킹에 올리는 중...', 22, '#b9c2cf');
+    submitScore(this.kitchen.id, result).then((res) => {
+      if (!rankText.active) return; // 그사이 화면을 나갔다
+      if (res.status === 'offline') rankText.setText('📴 오프라인이라 랭킹에 올리지 못했어요');
+      else if (res.status === 'new') rankText.setText(`🎉 랭킹 ${res.rank}위! (내 최고 기록)`).setColor(COLORS.gold);
+      else rankText.setText(`내 최고 ${res.best}점 · ${res.rank}위`);
+    });
 
     // 버튼은 알림 줄 수에 맞춰 그 아래에 놓는다
     const buttonY = Math.max(centerY + 230, y + 100);

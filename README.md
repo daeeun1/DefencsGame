@@ -58,6 +58,7 @@ src/
     KitchenSelectScene.js  주방 선택 화면
     ShopScene.js      가게 강화 화면
     CodexScene.js     레시피 도감 화면
+    RankingScene.js   🏆 주방별 랭킹 화면
     GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 합성, 강화, 승패 판정)
 ```
 
@@ -72,5 +73,6 @@ src/
 ## ☁️ 클라우드 저장 (Firebase)
 
 - 저장 기록은 휴대폰(localStorage)과 Firebase Firestore `saves/{계정 id}`에 함께 저장됩니다.
+- 랭킹은 `leaderboards/{주방 id}/scores/{계정 id}`에 계정마다 최고 점수 하나씩 저장됩니다.
 - 보안 규칙은 `firestore.rules`에 있습니다. Firebase 콘솔 → Firestore Database → 규칙에 붙여 넣고 게시하세요.
 - 인터넷이 없거나 Firebase가 준비되지 않았으면 휴대폰 저장만으로 그대로 플레이됩니다.

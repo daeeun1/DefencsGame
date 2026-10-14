@@ -35,3 +35,13 @@ export const CODEX_BASE_COST = { 1: 50, 2: 100, 3: 200, 4: 400, 5: 800 };
 export function codexCost(tier, level) {
   return CODEX_BASE_COST[tier] * (level + 1);
 }
+
+// ───────── 🏆 랭킹 점수 ─────────
+
+// 한 판의 점수 = 도달 웨이브 × 100 + 처리한 주문 × 5 + 별 × 1000
+// (Firestore 보안 규칙 firestore.rules에서도 같은 계산으로 점수를 검사한다)
+export const SCORE_RULE = { wave: 100, order: 5, star: 1000 };
+
+export function runScore({ wave, orders, stars }) {
+  return wave * SCORE_RULE.wave + orders * SCORE_RULE.order + stars * SCORE_RULE.star;
+}

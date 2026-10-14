@@ -8,6 +8,7 @@ import KitchenSelectScene from './scenes/KitchenSelectScene.js';
 import GameScene from './scenes/GameScene.js';
 import ShopScene from './scenes/ShopScene.js';
 import CodexScene from './scenes/CodexScene.js';
+import RankingScene from './scenes/RankingScene.js';
 import { startCloud } from './cloud.js';
 
 // 도트 글꼴(갈무리)을 먼저 불러온다. 글꼴이 준비되기 전에 글씨를 그리면 다른 글꼴로 나와 버린다.
@@ -36,7 +37,7 @@ function startGame() {
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
     },
-    scene: [BootScene, TitleScene, KitchenSelectScene, GameScene, ShopScene, CodexScene], // 첫 번째 장면이 가장 먼저 열린다
+    scene: [BootScene, TitleScene, KitchenSelectScene, GameScene, ShopScene, CodexScene, RankingScene], // 첫 번째 장면이 가장 먼저 열린다
   });
 
   // 개발 중에만: 브라우저 콘솔에서 game으로 게임 상태를 들여다볼 수 있게 한다

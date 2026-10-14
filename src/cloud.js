@@ -1,5 +1,5 @@
 import { firebaseConfig } from './firebase-config.js';
-import { getSave, replaceSave, onSaveWritten } from './save.js';
+import { getSave, writeSave, replaceSave, onSaveWritten } from './save.js';
 
 // ☁️ 클라우드 저장 (Firebase).
 // - 게임을 켜면 익명 계정으로 자동 로그인하고, 저장 기록을 Firestore의 saves/{계정 id}에 올린다.
@@ -118,4 +118,96 @@ export async function linkGoogle() {
     console.warn('구글 계정 연결 실패', error);
     return '연결하지 못했어요';
   }
+}
+
+// ───────── 🏆 랭킹 ─────────
+// Firestore: leaderboards/{주방 id}/scores/{계정 id} = { name, score, wave, stars, orders, updatedAt }
+// 계정마다 주방별 최고 점수 하나만 남는다.
+
+const NAME_MAX = 10;
+
+// 랭킹에 보일 이름. 정하지 않았으면 구글 이름 앞부분, 그것도 없으면 "손님1234"
+export function nickname() {
+  const save = getSave();
+  if (save.nickname) return save.nickname;
+  const google = linkedAccount();
+  if (google) return google.slice(0, NAME_MAX);
+  const uid = fb?.auth.currentUser?.uid ?? '0000';
+  const digits = [...uid].reduce((sum, ch) => (sum * 31 + ch.charCodeAt(0)) % 10000, 7);
+  return `손님${String(digits).padStart(4, '0')}`;
+}
+
+// 이름 바꾸기 (앞뒤 공백을 빼고 10글자까지). 바꾼 이름을 돌려준다
+export function setNickname(name) {
+  const clean = String(name ?? '').trim().slice(0, NAME_MAX);
+  if (!clean) return nickname();
+  getSave().nickname = clean;
+  writeSave();
+  return clean;
+}
+
+export function isOnline() {
+  return Boolean(fb?.auth.currentUser) && status !== 'offline';
+}
+
+function scoreRef(kitchenId, uid = fb.auth.currentUser.uid) {
+  return fb.doc(fb.db, 'leaderboards', kitchenId, 'scores', uid);
+}
+
+// 판 결과를 올린다. 이 주방 최고 점수보다 높을 때만 올라간다.
+// 돌려주는 값: { status: 'new' | 'kept' | 'offline', best, rank }
+export async function submitScore(kitchenId, result) {
+  if (!isOnline()) return { status: 'offline' };
+  try {
+    const ref = scoreRef(kitchenId);
+    const old = await fb.getDoc(ref);
+    const best = old.exists() ? old.data().score : -1;
+    let state = 'kept';
+    if (result.score > best) {
+      await fb.setDoc(ref, { name: nickname(), ...result, updatedAt: fb.serverTimestamp() });
+      state = 'new';
+    }
+    const myBest = Math.max(best, result.score);
+    return { status: state, best: myBest, rank: await rankOf(kitchenId, myBest) };
+  } catch (error) {
+    console.warn('랭킹에 올리지 못했어요', error);
+    return { status: 'offline' };
+  }
+}
+
+// 이 점수가 몇 등인지 (나보다 점수가 높은 사람 수 + 1)
+async function rankOf(kitchenId, score) {
+  const higher = fb.query(fb.collection(fb.db, 'leaderboards', kitchenId, 'scores'), fb.where('score', '>', score));
+  const snap = await fb.getCountFromServer(higher);
+  return snap.data().count + 1;
+}
+
+// 주방별 상위 기록과 내 기록. 실패하면 null
+export async function fetchLeaderboard(kitchenId, limit = 50) {
+  if (!isOnline()) return null;
+  try {
+    const top = fb.query(fb.collection(fb.db, 'leaderboards', kitchenId, 'scores'), fb.orderBy('score', 'desc'), fb.limit(limit));
+    const [list, mine] = await Promise.all([fb.getDocs(top), fb.getDoc(scoreRef(kitchenId))]);
+    const uid = fb.auth.currentUser.uid;
+    const rows = list.docs.map((d, i) => ({ rank: i + 1, uid: d.id, me: d.id === uid, ...d.data() }));
+    let me = null;
+    if (mine.exists()) me = { ...mine.data(), me: true, rank: await rankOf(kitchenId, mine.data().score) };
+    return { rows, me };
+  } catch (error) {
+    console.warn('랭킹을 불러오지 못했어요', error);
+    return null;
+  }
+}
+
+// 이름을 바꾸면 이미 올린 랭킹 기록의 이름도 바꾼다
+export async function renameEverywhere(kitchenIds) {
+  if (!isOnline()) return;
+  const name = nickname();
+  await Promise.all(
+    kitchenIds.map(async (id) => {
+      const ref = scoreRef(id);
+      const snap = await fb.getDoc(ref);
+      if (snap.exists()) await fb.setDoc(ref, { ...snap.data(), name, updatedAt: fb.serverTimestamp() });
+    }),
+  ).catch((error) => console.warn('랭킹 이름을 바꾸지 못했어요', error));
 }

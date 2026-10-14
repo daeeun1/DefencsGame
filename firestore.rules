@@ -1,16 +1,43 @@
 rules_version = '2';
 
 // 🔒 Firestore 보안 규칙
-// 각 플레이어는 자기 계정의 저장 기록(saves/{자기 id})만 읽고 쓸 수 있다.
 // Firebase 콘솔 → Firestore Database → 규칙 탭에 이 내용을 붙여 넣고 "게시"한다.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ☁️ 저장 기록: 각 플레이어는 자기 계정의 기록(saves/{자기 id})만 읽고 쓸 수 있다.
     match /saves/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null
         && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['save', 'version', 'updatedAt'])
         && request.resource.data.save is map;
+    }
+
+    // 🏆 랭킹: 누구나 볼 수 있고, 자기 기록만 올릴 수 있다.
+    // 점수는 게임과 같은 계산(웨이브×100 + 주문×5 + 별×1000)이어야 하고, 이전 기록보다 낮아질 수 없다.
+    match /leaderboards/{kitchen}/scores/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && kitchen in ['snack_bar', 'sushi_bar', 'chinese', 'blackout']
+        && request.resource.data.keys().hasOnly(['name', 'score', 'wave', 'stars', 'orders', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 10
+        && request.resource.data.wave is int
+        && request.resource.data.wave >= 1
+        && request.resource.data.wave <= 30
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 0
+        && request.resource.data.stars * 10 <= request.resource.data.wave
+        && request.resource.data.orders is int
+        && request.resource.data.orders >= 0
+        && request.resource.data.orders <= 1500
+        && request.resource.data.score == request.resource.data.wave * 100
+          + request.resource.data.orders * 5
+          + request.resource.data.stars * 1000
+        && (resource == null || request.resource.data.score >= resource.data.score);
     }
   }
 }

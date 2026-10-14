@@ -60,8 +60,9 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     createButton(this, centerX, top + 800, 400, 110, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 38 });
-    createButton(this, centerX, top + 930, 400, 100, '🏪 가게 강화', () => this.scene.start('Shop'));
-    createButton(this, centerX, top + 1050, 400, 100, '📖 레시피 도감', () => this.scene.start('Codex'));
+    createButton(this, centerX - 105, top + 930, 200, 100, '🏪 가게\n강화', () => this.scene.start('Shop'), { fontSize: 28 });
+    createButton(this, centerX + 105, top + 930, 200, 100, '📖 레시피\n도감', () => this.scene.start('Codex'), { fontSize: 28 });
+    createButton(this, centerX, top + 1050, 410, 100, '🏆 랭킹', () => this.scene.start('Ranking'), { color: 0xc77d2e });
 
     // 설정: 효과음 / 음악 / 진동 켜고 끄기
     const options = [
