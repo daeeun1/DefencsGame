@@ -154,6 +154,17 @@ export const TOOLS = {
   },
 };
 
+// 🎅 크리스마스에 요리사 동그라미에 씌우는 작은 산타 모자
+export const SANTA_HAT = [
+  '.....kk.',
+  '....kwwk',
+  '...krrk.',
+  '..krrrk.',
+  '.krrrrrk',
+  'kwwwwwwk',
+  'kkkkkkkk',
+];
+
 // ───────── 주문 ─────────
 export const ORDERS = {
   salad: [

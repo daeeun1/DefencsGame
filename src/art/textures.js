@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PALETTE, CHEF_BODY, TOOLS, ORDERS } from './sprites.js';
+import { PALETTE, CHEF_BODY, TOOLS, ORDERS, SANTA_HAT } from './sprites.js';
 import { CHEFS, TIERS } from '../data/chefs.js';
 import { isChristmas } from '../eastereggs.js';
 
@@ -7,7 +7,8 @@ import { isChristmas } from '../eastereggs.js';
 //
 // 만들어지는 그림 이름:
 //   chef_<요리사 id>   요리사 (16 x 16)
-//   tool_<조리법>       조리법 도구 (약점 표시 등에 사용)
+//   tool_<조리법>       조리법 도구 (게임 화면의 요리사, 약점 표시에 사용)
+//   santa_hat           크리스마스 산타 모자
 //   order_<주문 종류>   주문과 VIP 손님 (16 x 16)
 
 // 신화 요리사의 모자 색
@@ -35,6 +36,8 @@ export function createTextures(scene) {
   for (const [key, tool] of Object.entries(TOOLS)) {
     makeTexture(scene, `tool_${key}`, tool.grid[0].length, tool.grid.length, (ctx) => drawGrid(ctx, tool.grid, PALETTE));
   }
+
+  makeTexture(scene, 'santa_hat', SANTA_HAT[0].length, SANTA_HAT.length, (ctx) => drawGrid(ctx, SANTA_HAT, PALETTE));
 
   for (const [key, grid] of Object.entries(ORDERS)) {
     makeTexture(scene, `order_${key}`, 16, 16, (ctx) => drawGrid(ctx, grid, PALETTE));

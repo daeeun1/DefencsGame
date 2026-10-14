@@ -46,11 +46,14 @@ export default class CodexScene extends Phaser.Scene {
 
       const bg = this.add.graphics();
       this.add.circle(x + 45, y + CARD_H / 2, 34, found ? TIERS[chef.tier].color : 0x5a4a3e).setStrokeStyle(4, 0x2b1d14);
-      if (found) this.add.image(x + 45, y + CARD_H / 2, `chef_${chef.id}`).setScale(4);
+      if (found) {
+        const icon = this.add.image(x + 45, y + CARD_H / 2, `tool_${chef.tool ?? chef.method}`);
+        icon.setScale(Math.max(1, Math.floor(44 / Math.max(icon.width, icon.height))));
+      }
       else this.add.text(x + 45, y + CARD_H / 2, '?', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: '#b9a48f' }).setOrigin(0.5);
       this.add.text(x + 88, y + 22, found ? chef.name : '???', {
         fontFamily: FONT,
-        fontSize: '20px',
+        fontSize: found && chef.name.length > 9 ? '16px' : '20px', // 긴 이름은 작게
         fontStyle: 'bold',
         color: found ? COLORS.text : '#8a7a6a',
         wordWrap: { width: CARD_W - 95, useAdvancedWrap: true },

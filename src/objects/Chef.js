@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { TIERS } from '../data/chefs.js';
+import { isChristmas } from '../eastereggs.js';
 
-const RADIUS = 42;
-const PIXEL_SCALE = 5; // 16 x 16 도트 그림을 5배로 키워서 80 x 80으로 그린다
+const RADIUS = 40;
+const ICON_SIZE = 56; // 도구 그림을 이 크기 안에 들어오게 키운다
 
 // 주방 칸에 서 있는 요리사 하나.
-// 등급 색깔 받침 위에 도트 그림 요리사가 서 있다. (앞치마 색 = 등급, 손에 든 도구 = 조리법)
+// 등급 색 동그라미 안에 조리법 도구(식칼, 프라이팬, 냄비, 얼음 등)가 그려져 있다.
 export default class Chef extends Phaser.GameObjects.Container {
   constructor(scene, data, slot) {
     super(scene, slot.x, slot.y);
@@ -18,9 +19,14 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.rangeScale = 1; // 사거리 배율 (정전된 레스토랑에서 어두운 칸이면 줄어든다)
 
     const tierColor = TIERS[data.tier].color;
-    const plate = scene.add.circle(0, 6, RADIUS, tierColor, 0.35).setStrokeStyle(3, tierColor, 0.8);
-    this.sprite = scene.add.image(0, 0, `chef_${data.id}`).setScale(PIXEL_SCALE);
-    this.body_ = scene.add.container(0, 0, [plate, this.sprite]);
+    const plate = scene.add.circle(0, 0, RADIUS, tierColor).setStrokeStyle(5, 0x3d2a1e);
+    this.sprite = scene.add.image(0, 0, `tool_${data.tool ?? data.method}`);
+    // 도구마다 그림 크기가 달라서, 긴 쪽이 ICON_SIZE에 맞도록 정수 배로 키운다 (도트가 또렷하게)
+    this.sprite.setScale(Math.max(1, Math.floor(ICON_SIZE / Math.max(this.sprite.width, this.sprite.height))));
+    const parts = [plate, this.sprite];
+    // 🎅 크리스마스에는 동그라미에 산타 모자를 씌운다
+    if (isChristmas()) parts.push(scene.add.image(-22, -34, 'santa_hat').setScale(4).setAngle(-15));
+    this.body_ = scene.add.container(0, 0, parts);
 
     this.add(this.body_);
     scene.add.existing(this);
