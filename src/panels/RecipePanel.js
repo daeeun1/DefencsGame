@@ -2,9 +2,12 @@ import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { METHODS, RECIPES, chefById } from '../data/chefs.js';
 import { RECIPE_UNLOCK_STARS } from '../data/progress.js';
 import { createButton } from '../ui.js';
+import { SETS, FULL_COURSE } from '../data/sets.js';
 
 const PANEL_WIDTH = 660;
 const ROW_HEIGHT = 300;
+const SET_LINE_HEIGHT = 34;
+const SET_SECTION_HEIGHT = 60 + (SETS.length + 1) * SET_LINE_HEIGHT; // 세트 메뉴 안내
 
 // 신화 레시피 창.
 // 레시피마다 결과 요리사, 능력, 재료(갖췄으면 ✅, 없으면 ❌)와 "만들기" 버튼을 보여 준다.
@@ -18,7 +21,7 @@ export default class RecipePanel {
     this.isUnlocked = isUnlocked;
 
     const screenHeight = scene.scale.height;
-    const panelHeight = 130 + RECIPES.length * ROW_HEIGHT + 120;
+    const panelHeight = 130 + RECIPES.length * ROW_HEIGHT + SET_SECTION_HEIGHT + 120;
     const top = (screenHeight - panelHeight) / 2;
     const left = (GAME_WIDTH - PANEL_WIDTH) / 2;
 
@@ -70,6 +73,27 @@ export default class RecipePanel {
 
       parts.push(name, desc, ...ingredientTexts, button);
       return { recipe, ingredientTexts, button };
+    });
+
+    // 🍽️ 세트 메뉴 안내: 다른 줄 유닛을 상하좌우로 붙이면 받는 효과
+    const setTop = top + 130 + RECIPES.length * ROW_HEIGHT;
+    parts.push(
+      scene.add.text(left + 36, setTop, '🍽️ 세트 메뉴 (다른 줄을 옆에 붙이기)', {
+        fontFamily: FONT,
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: COLORS.gold,
+      }),
+    );
+    [...SETS, { ...FULL_COURSE, lines: null }].forEach((set, i) => {
+      const combo = set.lines ? set.lines.map((m) => METHODS[m].emoji).join('+') : '2×2';
+      parts.push(
+        scene.add.text(left + 36, setTop + 50 + i * SET_LINE_HEIGHT, `${set.emoji} ${set.name} (${combo})  ${set.lines ? set.desc : '공격력 +30%'}`, {
+          fontFamily: FONT,
+          fontSize: '20px',
+          color: COLORS.text,
+        }),
+      );
     });
 
     const closeButton = createButton(scene, GAME_WIDTH / 2, top + panelHeight - 70, 260, 84, '닫기', () => this.close(), {
