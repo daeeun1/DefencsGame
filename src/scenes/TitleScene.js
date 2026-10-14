@@ -17,9 +17,17 @@ export default class TitleScene extends Phaser.Scene {
     const save = getSave();
     playMusic('title');
 
-    this.add.circle(centerX, top + 265, 110, 0xf3e3c3).setStrokeStyle(8, 0xe85d3a);
-    const chef = this.add.image(centerX, top + 258, 'chef_head_chef').setScale(10);
-    this.tweens.add({ targets: chef, y: chef.y - 10, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    // 주방 로고: 가운데 샐러드, 양옆에 식칼과 프라이팬
+    const logoY = top + 265;
+    this.add.circle(centerX, logoY, 110, 0xf3e3c3).setStrokeStyle(8, 0xe85d3a);
+    const salad = this.add.image(centerX, logoY + 5, 'order_salad').setScale(10);
+    this.add.circle(centerX - 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
+    this.add.circle(centerX + 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
+    const knife = this.add.image(centerX - 165, logoY + 40, 'tool_cut').setScale(9).setAngle(-20);
+    const pan = this.add.image(centerX + 165, logoY + 40, 'tool_grill').setScale(11).setAngle(10);
+    this.tweens.add({ targets: salad, y: salad.y - 10, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: knife, angle: -30, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: pan, angle: 20, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 200 });
 
     this.add
       .text(centerX, top + 460, '주방 디펜스', {
