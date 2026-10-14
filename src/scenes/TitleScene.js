@@ -23,10 +23,10 @@ export default class TitleScene extends Phaser.Scene {
     const save = getSave();
     playMusic('title');
 
-    // 주방 로고: 가운데 샐러드, 양옆에 빵과 케이크
+    // 주방 로고: 가운데 샐러드, 양옆에 빵과 케이크 (모두 이모지)
     const logoY = top + 210;
     this.add.circle(centerX, logoY, 110, 0xf3e3c3).setStrokeStyle(8, 0xe85d3a);
-    const salad = this.add.image(centerX, logoY + 5, 'order_salad').setScale(10);
+    const salad = this.add.text(centerX, logoY + 5, '🥗', { fontFamily: EMOJI_FONT, fontSize: '120px' }).setOrigin(0.5);
     this.add.circle(centerX - 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
     this.add.circle(centerX + 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
     const bread = this.add.text(centerX - 165, logoY + 40, '🍞', { fontFamily: EMOJI_FONT, fontSize: '64px' }).setOrigin(0.5).setAngle(-20);
