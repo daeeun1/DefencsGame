@@ -3,6 +3,7 @@ import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { playMusic, sfx } from '../audio.js';
 import { KITCHENS } from '../data/kitchens.js';
 import { SCORE_RULE } from '../data/progress.js';
+import { todaysSpecial } from '../data/daily.js';
 import { fetchLeaderboard, nickname, setNickname, renameEverywhere, isOnline } from '../cloud.js';
 
 const ROW_HEIGHT = 50;
@@ -28,13 +29,23 @@ export default class RankingScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
 
-    // 주방 탭
-    const tabWidth = (GAME_WIDTH - 40) / KITCHENS.length;
-    this.tabs = KITCHENS.map((kitchen, i) => {
+    // 탭: 오늘의 특선(일일 랭킹) + 주방 4곳
+    const daily = todaysSpecial();
+    const boards = [
+      { id: daily.boardId, emoji: '🍽️', name: '오늘의 특선' },
+      ...KITCHENS.map((k) => ({ id: k.id, emoji: k.emoji, name: k.name })),
+    ];
+    const tabWidth = (GAME_WIDTH - 40) / boards.length;
+    this.tabs = boards.map((kitchen, i) => {
       const x = 20 + i * tabWidth + tabWidth / 2;
       const bg = this.add.rectangle(x, 160, tabWidth - 8, 64, COLORS.hud).setInteractive({ useHandCursor: true });
       const label = this.add
-        .text(x, 160, `${kitchen.emoji}\n${kitchen.name}`, { fontFamily: FONT, fontSize: '17px', color: COLORS.text, align: 'center' })
+        .text(x, 160, `${kitchen.emoji}\n${kitchen.name}`, {
+          fontFamily: FONT,
+          fontSize: kitchen.name.length > 6 ? '13px' : '16px',
+          color: COLORS.text,
+          align: 'center',
+        })
         .setOrigin(0.5);
       bg.on('pointerup', () => {
         sfx.click();
@@ -98,7 +109,7 @@ export default class RankingScene extends Phaser.Scene {
       if (input === null) return;
       setNickname(input);
       showName();
-      await renameEverywhere(KITCHENS.map((k) => k.id));
+      await renameEverywhere(boards.map((b) => b.id));
       this.show(this.current);
     });
 

@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT, COLORS, FONT, EMOJI_FONT } from '../config.js'
 import { createButton } from '../ui.js';
 import { getSave, totalStars } from '../save.js';
 import { playMusic, isOn, toggle } from '../audio.js';
+import { todaysSpecial, DAILY_TIP_BONUS } from '../data/daily.js';
 import { cloudStatus, linkedAccount, linkGoogle, onCloudChange } from '../cloud.js';
 
 // 첫 화면: 게임 제목, 내 팁과 별, 영업 시작 / 가게 강화 / 요리사 도감 버튼.
@@ -62,7 +63,8 @@ export default class TitleScene extends Phaser.Scene {
     createButton(this, centerX, top + 800, 400, 110, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 38 });
     createButton(this, centerX - 105, top + 930, 200, 100, '🏪 가게\n강화', () => this.scene.start('Shop'), { fontSize: 28 });
     createButton(this, centerX + 105, top + 930, 200, 100, '📖 레시피\n도감', () => this.scene.start('Codex'), { fontSize: 28 });
-    createButton(this, centerX, top + 1050, 410, 100, '🏆 랭킹', () => this.scene.start('Ranking'), { color: 0xc77d2e });
+    createButton(this, centerX - 105, top + 1050, 200, 100, '🍽️ 오늘의\n특선', () => this.showDaily(), { fontSize: 28, color: 0x8e4fc0 });
+    createButton(this, centerX + 105, top + 1050, 200, 100, '🏆 랭킹', () => this.scene.start('Ranking'), { color: 0xc77d2e });
 
     // 설정: 효과음 / 음악 / 진동 켜고 끄기
     const options = [
@@ -144,5 +146,41 @@ export default class TitleScene extends Phaser.Scene {
       else refresh();
     });
     this.events.once('shutdown', off);
+  }
+
+  // 🍽️ 오늘의 특선 안내 창: 오늘의 주방과 규칙을 보여 주고 시작한다
+  showDaily() {
+    const { date, kitchen, special } = todaysSpecial();
+    const centerX = GAME_WIDTH / 2;
+    const centerY = this.scale.height / 2;
+    const shade = this.add.rectangle(0, 0, GAME_WIDTH, this.scale.height, 0x000000, 0.7).setOrigin(0).setInteractive();
+    const box = this.add.graphics();
+    box.fillStyle(0x3d2a1e, 1);
+    box.fillRoundedRect(centerX - 290, centerY - 330, 580, 660, 24);
+    box.lineStyle(5, 0x8e4fc0, 1);
+    box.strokeRoundedRect(centerX - 290, centerY - 330, 580, 660, 24);
+    const text = (y, message, size, color = COLORS.text, bold = false) =>
+      this.add
+        .text(centerX, y, message, { fontFamily: FONT, fontSize: `${size}px`, fontStyle: bold ? 'bold' : '', color, align: 'center', wordWrap: { width: 520 } })
+        .setOrigin(0.5);
+    const parts = [
+      shade,
+      box,
+      text(centerY - 270, '🍽️ 오늘의 특선 메뉴', 38, COLORS.text, true),
+      text(centerY - 220, date, 22, '#b9a48f'),
+      this.add.text(centerX, centerY - 130, special.emoji, { fontFamily: EMOJI_FONT, fontSize: '84px' }).setOrigin(0.5),
+      text(centerY - 50, special.name, 40, COLORS.gold, true),
+      text(centerY + 10, special.desc, 24),
+      text(centerY + 75, `주방: ${kitchen.emoji} ${kitchen.name}\n(잠긴 주방도 오늘은 할 수 있어요)`, 22, '#d8c8b4'),
+      text(centerY + 140, `팁 ×${DAILY_TIP_BONUS} 보너스 · 일일 랭킹에 기록`, 22, '#d8c8b4'),
+    ];
+    const close = () => parts.forEach((p) => p.destroy());
+    parts.push(
+      createButton(this, centerX - 130, centerY + 245, 220, 96, '닫기', close, { color: 0x7d8594 }),
+      createButton(this, centerX + 130, centerY + 245, 220, 96, '▶ 시작', () => this.scene.start('Game', { daily: true }), {
+        color: 0x3f9a4a,
+      }),
+    );
+    for (const p of parts) p.setDepth(20);
   }
 }

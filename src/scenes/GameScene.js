@@ -63,6 +63,7 @@ import {
   runScore,
 } from '../data/progress.js';
 import { submitScore } from '../cloud.js';
+import { todaysSpecial, DAILY_TIP_BONUS } from '../data/daily.js';
 
 // 가게 강화 효과 = 레벨 × 한 단계당 효과
 function shopBonus(id) {
@@ -94,8 +95,11 @@ export default class GameScene extends Phaser.Scene {
 
   // data.kitchen: 고른 주방 id (주방 선택 화면에서 넘어온다)
   create(data) {
-    this.kitchen = kitchenById(data?.kitchen ?? this.registry.get('kitchen'));
-    this.registry.set('kitchen', this.kitchen.id);
+    // 🍽️ 오늘의 특선이면 오늘 정해진 주방과 특별 규칙으로 한다
+    this.daily = data?.daily ? todaysSpecial() : null;
+    this.mod = this.daily?.special.rule ?? {}; // 특별 규칙 (평소에는 비어 있다)
+    this.kitchen = this.daily ? this.daily.kitchen : kitchenById(data?.kitchen ?? this.registry.get('kitchen'));
+    if (!this.daily) this.registry.set('kitchen', this.kitchen.id);
     this.screenHeight = this.scale.height; // 휴대폰마다 다른 실제 화면 높이
     this.layout = gameLayout(this.screenHeight);
     this.boardY = this.layout.boardY;
@@ -307,7 +311,7 @@ export default class GameScene extends Phaser.Scene {
     this.freezeOverlay.setVisible(frozen);
     const rush = this.rushTimeLeft > 0 ? this.kitchen.gimmick.factor : 1;
     for (const order of [...this.orders]) {
-      const moveScale = (frozen ? (order.isBoss ? 0.5 : 0) : 1) * rush;
+      const moveScale = (frozen ? (order.isBoss ? 0.5 : 0) : 1) * rush * (this.mod.orderSpeed ?? 1);
       const dotDamage = order.step(dt, moveScale);
       if (order.golden && order.distance - order.startDistance >= this.rail.length) {
         this.escapeOrder(order); // 🥚 황금 주문은 한 바퀴 돌면 사라진다
@@ -373,7 +377,11 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.waveTimeLeft = WAVE_DURATION;
       if (wave > 1) sfx.wave();
-      if (wave === 1) this.showBanner(`${this.kitchen.emoji} ${this.kitchen.name}\n${this.kitchen.desc}`, COLORS.textDark, 40);
+      if (wave === 1 && this.daily) {
+        const sp = this.daily.special;
+        this.showBanner(`🍽️ 오늘의 특선\n${sp.emoji} ${sp.name}`, COLORS.gold, 44);
+        this.log(`🍽️ ${sp.name}: ${sp.desc}`, COLORS.gold);
+      } else if (wave === 1) this.showBanner(`${this.kitchen.emoji} ${this.kitchen.name}\n${this.kitchen.desc}`, COLORS.textDark, 40);
       else this.showBanner(`웨이브 ${wave}`);
     }
   }
@@ -381,6 +389,12 @@ export default class GameScene extends Phaser.Scene {
   // 주문을 레일에 올린다. startDistance: 레일 위 어디서 시작할지 (도시락이 나뉠 때 사용)
   spawnOrder(typeKey, startDistance = 0, options = {}) {
     const order = new Order(this, this.rail, typeKey, this.wave, startDistance, options);
+    // 🍽️ 오늘의 특선 규칙: 주문 체력, 추가 골드
+    if (this.mod.orderHp) {
+      order.maxHp = Math.round(order.maxHp * this.mod.orderHp);
+      order.hp = order.maxHp;
+    }
+    if (this.mod.orderReward && !order.isBoss) order.reward += this.mod.orderReward;
     if (typeKey === 'gg') this.eggFound('gg');
     if (order.golden && typeKey !== 'ramen') this.showBanner('✨ 황금 주문이다!', COLORS.gold, 44);
     this.orderLayer.add(order);
@@ -583,7 +597,7 @@ export default class GameScene extends Phaser.Scene {
     this.gold -= cost;
     this.summonCount += 1;
 
-    const tier = Number(pickWeighted(SUMMON_ODDS));
+    const tier = Number(pickWeighted(this.mod.summonOdds ?? SUMMON_ODDS));
     let data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
     if (Math.random() < DISHWASHER_CHANCE) data = chefById('dishwasher'); // 🥚 0.1%
     const slot = Phaser.Utils.Array.GetRandom(empty);
@@ -665,12 +679,14 @@ export default class GameScene extends Phaser.Scene {
   // 공격력 배율: 이번 판의 등급별 강화 × 도감 레벨(영구) × 세트 메뉴
   powerMultiplier(stats, chef = null) {
     const setBonus = 1 + (chef ? chef.bonus.damage : 0);
-    return this.upgradeMultiplier(stats.tier) * (1 + codexLevel(stats.id) * CODEX_DAMAGE_PER_LEVEL) * setBonus;
+    const daily = this.mod.lineDamage?.[stats.method] ?? 1; // 🍽️ 오늘의 특선: 줄별 공격력
+    return this.upgradeMultiplier(stats.tier) * (1 + codexLevel(stats.id) * CODEX_DAMAGE_PER_LEVEL) * setBonus * daily;
   }
 
   // 뽑기 비용: 기본 비용에서 가게 강화(단골 인력소)만큼 할인
   currentSummonCost() {
-    return summonCost(this.summonCount) - shopBonus('summonDiscount');
+    const cost = summonCost(this.summonCount) - shopBonus('summonDiscount');
+    return Math.max(1, Math.round(cost * (this.mod.summonCost ?? 1))); // 🍽️ 할인 데이
   }
 
   // 약점이면 1.5배 (🥘 고기 전골 세트면 1.8배). 까다로운 주문은 약점이 아닌 줄이면 절반.
@@ -787,16 +803,17 @@ export default class GameScene extends Phaser.Scene {
     // 유닛마다 효과 합치기
     for (const chef of this.chefs) {
       const bonus = { damage: 0, attackSpeed: 0, range: 0, weakness: 0, slow: null, gold: 0 };
+      const p = this.mod.setPower ?? 1; // 🍽️ 세트 데이면 효과 2배
       for (const set of SETS.filter((s) => chef.sets.has(s.id))) {
         const e = set.effect;
-        bonus.damage += e.damage ?? 0;
-        bonus.attackSpeed += e.attackSpeed ?? 0;
-        bonus.range += e.range ?? 0;
-        bonus.weakness = Math.max(bonus.weakness, e.weakness ?? 0);
-        bonus.slow = e.slow ?? bonus.slow;
-        bonus.gold += e.gold ?? 0;
+        bonus.damage += (e.damage ?? 0) * p;
+        bonus.attackSpeed += (e.attackSpeed ?? 0) * p;
+        bonus.range += (e.range ?? 0) * p;
+        if (e.weakness) bonus.weakness = Math.max(bonus.weakness, WEAKNESS_MULTIPLIER + (e.weakness - WEAKNESS_MULTIPLIER) * p);
+        if (e.slow) bonus.slow = { factor: Math.max(0.3, 1 - (1 - e.slow.factor) * p), duration: e.slow.duration };
+        bonus.gold += (e.gold ?? 0) * p;
       }
-      if (chef.fullCourse) bonus.damage += FULL_COURSE.effect.damage;
+      if (chef.fullCourse) bonus.damage += FULL_COURSE.effect.damage * p;
       chef.bonus = bonus;
       chef.attackSpeed += bonus.attackSpeed;
       chef.rangeBonus = bonus.range;
@@ -1179,7 +1196,8 @@ export default class GameScene extends Phaser.Scene {
     ).setLineSpacing(6);
 
     let y = centerY + 10;
-    const bonus = this.kitchen.tipBonus > 1 ? ` · ×${this.kitchen.tipBonus}` : '';
+    const tipRate = this.tipRate();
+    const bonus = tipRate !== 1 ? ` · ×${Math.round(tipRate * 100) / 100}` : '';
     text(y, `🪙 팁 +${rewards.tips}  (주문 ${this.ordersServed}개 · 별 ${rewards.stars}개${bonus})`, 26, COLORS.gold, true);
     if (rewards.newBest) text((y += 42), '🏆 새 최고 기록!', 26, COLORS.gold, true);
     for (const message of rewards.unlocked) text((y += 40), `🔓 ${message}`, 22, '#ff8a8a', true);
@@ -1189,28 +1207,40 @@ export default class GameScene extends Phaser.Scene {
     result.score = runScore(result);
     text((y += 46), `🏆 점수 ${result.score}`, 28, COLORS.gold, true);
     const rankText = text((y += 38), '랭킹에 올리는 중...', 22, '#b9c2cf');
-    submitScore(this.kitchen.id, result).then((res) => {
+    submitScore(this.daily ? this.daily.boardId : this.kitchen.id, result).then((res) => {
       if (!rankText.active) return; // 그사이 화면을 나갔다
       if (res.status === 'offline') rankText.setText('📴 오프라인이라 랭킹에 올리지 못했어요');
-      else if (res.status === 'new') rankText.setText(`🎉 랭킹 ${res.rank}위! (내 최고 기록)`).setColor(COLORS.gold);
+      else if (res.status === 'new') rankText.setText(`🎉 ${this.daily ? '오늘의 ' : ''}랭킹 ${res.rank}위! (내 최고 기록)`).setColor(COLORS.gold);
       else rankText.setText(`내 최고 ${res.best}점 · ${res.rank}위`);
     });
 
     // 버튼은 알림 줄 수에 맞춰 그 아래에 놓는다
     const buttonY = Math.max(centerY + 230, y + 100);
-    createButton(this, centerX, buttonY, 360, 100, '다시 하기', () => this.scene.restart({ kitchen: this.kitchen.id })).setDepth(depth);
-    createButton(this, centerX, buttonY + 115, 360, 100, '주방 선택', () => this.scene.start('KitchenSelect')).setDepth(depth);
+    createButton(this, centerX, buttonY, 360, 100, '다시 하기', () => this.restartRun()).setDepth(depth);
+    if (this.daily) createButton(this, centerX, buttonY + 115, 360, 100, '처음으로', () => this.scene.start('Title')).setDepth(depth);
+    else createButton(this, centerX, buttonY + 115, 360, 100, '주방 선택', () => this.scene.start('KitchenSelect')).setDepth(depth);
   }
 
-  // 판 끝 보상: 별과 팁을 계산해서 저장한다
+  // 같은 판을 처음부터 다시 (오늘의 특선이면 특선으로)
+  restartRun() {
+    this.scene.restart(this.daily ? { daily: true } : { kitchen: this.kitchen.id });
+  }
+
+  // 팁 배율: 주방 보너스 × (오늘의 특선 보너스 × 특선 규칙)
+  tipRate() {
+    return this.kitchen.tipBonus * (this.daily ? DAILY_TIP_BONUS * (this.mod.tips ?? 1) : 1);
+  }
+
+  // 판 끝 보상: 별과 팁을 계산해서 저장한다.
+  // 오늘의 특선은 팁만 받고, 주방 최고 별(해금 진행)에는 들어가지 않는다.
   giveRewards() {
     const save = getSave();
     const stars = Math.min(3, this.bossesDefeated);
-    const tips = Math.round((this.ordersServed * TIPS_PER_ORDER + stars * TIPS_PER_STAR) * this.kitchen.tipBonus);
+    const tips = Math.round((this.ordersServed * TIPS_PER_ORDER + stars * TIPS_PER_STAR) * this.tipRate());
 
     const starsBefore = totalStars();
     const best = save.bestStars[this.kitchen.id] ?? 0;
-    const newBest = stars > best;
+    const newBest = !this.daily && stars > best;
     if (newBest) save.bestStars[this.kitchen.id] = stars;
     save.tips += tips;
     save.runs += 1;
@@ -1634,7 +1664,7 @@ export default class GameScene extends Phaser.Scene {
       color: 0x3f9a4a,
     });
     const restart = createButton(this, centerX, centerY + 5, 400, 100, '🔄 다시 하기', () =>
-      this.scene.restart({ kitchen: this.kitchen.id }),
+      this.restartRun(),
     );
     const home = createButton(this, centerX, centerY + 130, 400, 100, '🏠 처음으로', () => this.scene.start('Title'), {
       color: 0x7d8594,

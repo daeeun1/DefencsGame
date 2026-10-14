@@ -14,13 +14,13 @@ service cloud.firestore {
         && request.resource.data.save is map;
     }
 
-    // 🏆 랭킹: 누구나 볼 수 있고, 자기 기록만 올릴 수 있다.
+    // 🏆 랭킹 (주방 4곳 + 날짜별 오늘의 특선 daily_20261014): 누구나 볼 수 있고, 자기 기록만 올릴 수 있다.
     // 점수는 게임과 같은 계산(웨이브×100 + 주문×5 + 별×1000)이어야 하고, 이전 기록보다 낮아질 수 없다.
     match /leaderboards/{kitchen}/scores/{uid} {
       allow read: if true;
       allow create, update: if request.auth != null
         && request.auth.uid == uid
-        && kitchen in ['snack_bar', 'sushi_bar', 'chinese', 'blackout']
+        && (kitchen in ['snack_bar', 'sushi_bar', 'chinese', 'blackout'] || kitchen.matches('daily_[0-9]{8}'))
         && request.resource.data.keys().hasOnly(['name', 'score', 'wave', 'stars', 'orders', 'updatedAt'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
