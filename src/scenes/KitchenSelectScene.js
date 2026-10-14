@@ -3,8 +3,10 @@ import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { getSave, totalStars } from '../save.js';
 import { playMusic } from '../audio.js';
 import { KITCHENS } from '../data/kitchens.js';
+import { GRADES, MAX_GRADE, gradeRules } from '../data/grades.js';
+import { sfx } from '../audio.js';
 
-const CARD_HEIGHT = 200;
+const CARD_HEIGHT = 180;
 const GAP = 20;
 
 // 주방 선택 화면: 열린 주방을 골라 영업을 시작한다.
@@ -28,13 +30,11 @@ export default class KitchenSelectScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
 
-    this.add
-      .text(GAME_WIDTH / 2, 170, `⭐ 모은 별 ${stars}`, { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: COLORS.gold })
-      .setOrigin(0.5);
+    this.createGradePicker(save);
 
     KITCHENS.forEach((kitchen, i) => {
       const x = 30;
-      const y = 230 + i * (CARD_HEIGHT + GAP);
+      const y = 330 + i * (CARD_HEIGHT + GAP);
       const width = GAME_WIDTH - 60;
       const unlocked = stars >= kitchen.unlockStars;
       const best = save.bestStars[kitchen.id] ?? 0;
@@ -68,8 +68,53 @@ export default class KitchenSelectScene extends Phaser.Scene {
 
       if (unlocked) {
         const hit = this.add.rectangle(x, y, width, CARD_HEIGHT, 0, 0).setOrigin(0).setInteractive({ useHandCursor: true });
-        hit.on('pointerup', () => this.scene.start('Game', { kitchen: kitchen.id }));
+        hit.on('pointerup', () => this.scene.start('Game', { kitchen: kitchen.id, grade: this.grade }));
       }
     });
+  }
+
+  // 🏅 미슐랭 등급 고르기: ◀ ▶로 열린 등급 안에서 고른다
+  createGradePicker(save) {
+    const maxOpen = Math.min(MAX_GRADE, (save.grade ?? 0) + 1);
+    this.grade = Math.min(maxOpen, this.registry.get('grade') ?? maxOpen);
+    const box = this.add.graphics();
+    box.fillStyle(0x3d2a1e, 1);
+    box.fillRoundedRect(30, 140, GAME_WIDTH - 60, 170, 22);
+    box.lineStyle(4, 0xffd54f, 1);
+    box.strokeRoundedRect(30, 140, GAME_WIDTH - 60, 170, 22);
+
+    const title = this.add.text(GAME_WIDTH / 2, 185, '', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: COLORS.gold }).setOrigin(0.5);
+    const rules = this.add
+      .text(GAME_WIDTH / 2, 248, '', { fontFamily: FONT, fontSize: '19px', color: '#d8c8b4', align: 'center', wordWrap: { width: GAME_WIDTH - 220 } })
+      .setOrigin(0.5);
+    const arrow = (x, text, delta) => {
+      const button = this.add
+        .text(x, 210, text, { fontFamily: FONT, fontSize: '56px', fontStyle: 'bold', color: COLORS.text })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+      button.on('pointerup', () => {
+        const next = this.grade + delta;
+        if (next < 1 || next > maxOpen) return sfx.denied();
+        sfx.click();
+        this.grade = next;
+        refresh();
+      });
+      return button;
+    };
+    const left = arrow(80, '◀', -1);
+    const right = arrow(GAME_WIDTH - 80, '▶', 1);
+
+    const refresh = () => {
+      const g = GRADES[this.grade - 1];
+      this.registry.set('grade', this.grade);
+      title.setText(`미슐랭 🏅${g.level} ${g.name}`);
+      const count = gradeRules(this.grade).length;
+      const locked = this.grade === maxOpen && maxOpen < MAX_GRADE ? '\n🔒 이 등급을 깨면 다음 등급이 열려요' : '';
+      const added = this.grade > 1 ? `새 규칙: ${g.desc}\n쌓인 규칙 ${count}개 · 팁 +${(this.grade - 1) * 10}%` : '기본 규칙 · 처음은 여기부터!';
+      rules.setText(added + locked);
+      left.setAlpha(this.grade > 1 ? 1 : 0.3);
+      right.setAlpha(this.grade < maxOpen ? 1 : 0.3);
+    };
+    refresh();
   }
 }

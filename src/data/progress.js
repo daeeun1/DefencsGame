@@ -39,9 +39,10 @@ export function codexCost(tier, level) {
 // ───────── 🏆 랭킹 점수 ─────────
 
 // 한 판의 점수 = 도달 웨이브 × 100 + 처리한 주문 × 5 + 별 × 1000
+// 랭킹 순서는 미슐랭 등급이 먼저: 저장할 때는 등급 × 100000을 더한다 (점수는 13500을 넘지 않는다)
 // (Firestore 보안 규칙 firestore.rules에서도 같은 계산으로 점수를 검사한다)
-export const SCORE_RULE = { wave: 100, order: 5, star: 1000 };
+export const SCORE_RULE = { wave: 100, order: 5, star: 1000, grade: 100000 };
 
-export function runScore({ wave, orders, stars }) {
-  return wave * SCORE_RULE.wave + orders * SCORE_RULE.order + stars * SCORE_RULE.star;
+export function runScore({ grade = 1, wave, orders, stars }) {
+  return grade * SCORE_RULE.grade + wave * SCORE_RULE.wave + orders * SCORE_RULE.order + stars * SCORE_RULE.star;
 }

@@ -14,6 +14,7 @@ import { KITCHENS } from './kitchens.js';
 //   tips         판 끝 팁 배율 (특선 기본 보너스에 곱한다)
 
 export const DAILY_TIP_BONUS = 1.5; // 오늘의 특선은 팁을 1.5배 더 준다
+export const DAILY_GRADE = 3; // 오늘의 특선은 모두 🏅3 등급 규칙으로 한다
 
 export const DAILY_RULES = [
   { id: 'bread', emoji: '🍞', name: '빵의 날', desc: '🍞 빵 줄 공격력 2배, 🍖 고기 줄 절반', rule: { lineDamage: { cut: 2, grill: 0.5 } } },

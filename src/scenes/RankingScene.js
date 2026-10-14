@@ -59,7 +59,7 @@ export default class RankingScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         215,
-        `점수 = 웨이브×${SCORE_RULE.wave} + 주문×${SCORE_RULE.order} + 별×${SCORE_RULE.star}`,
+        `높은 🏅등급이 먼저 · 점수 = 웨이브×${SCORE_RULE.wave} + 주문×${SCORE_RULE.order} + 별×${SCORE_RULE.star}`,
         { fontFamily: FONT, fontSize: '19px', color: '#b9a48f' },
       )
       .setOrigin(0.5);
@@ -141,8 +141,10 @@ export default class RankingScene extends Phaser.Scene {
     this.message.setText(data.rows.length === 0 ? '아직 기록이 없어요\n첫 번째 주인공이 되어 보세요!' : '');
     this.fill(data.rows.slice(0, SHOW_ROWS));
     if (data.me) {
-      this.myText.setText(`나  ${data.me.rank}위  ${data.me.name}\n${data.me.wave}웨이브 · ⭐${data.me.stars} · 주문 ${data.me.orders}`);
-      this.myScore.setText(`${data.me.score}`);
+      this.myText.setText(
+        `나  ${data.me.rank}위  ${data.me.name}\n${data.me.grade ? `🏅${data.me.grade}등급 · ` : ''}${data.me.wave}웨이브 · ⭐${data.me.stars} · 주문 ${data.me.orders}`,
+      );
+      this.myScore.setText(`${data.me.score % SCORE_RULE.grade}`);
     } else {
       this.myText.setText('나  아직 기록이 없어요');
     }
@@ -160,8 +162,8 @@ export default class RankingScene extends Phaser.Scene {
       row.bg.setFillStyle(data.me ? 0x7a4a2a : 0x3d2a1e);
       row.rank.setText(medals[i] ?? `${data.rank}`);
       row.name.setText(data.name);
-      row.detail.setText(`${data.wave}웨이브 ⭐${data.stars}`);
-      row.score.setText(`${data.score}`);
+      row.detail.setText(`${data.grade ? `🏅${data.grade} · ` : ''}${data.wave}웨이브`);
+      row.score.setText(`${data.score % SCORE_RULE.grade}`);
     });
   }
 }
