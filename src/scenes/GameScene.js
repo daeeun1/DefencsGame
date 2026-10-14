@@ -63,7 +63,7 @@ import {
   runScore,
 } from '../data/progress.js';
 import { submitScore } from '../cloud.js';
-import { todaysSpecial, DAILY_TIP_BONUS, DAILY_GRADE } from '../data/daily.js';
+import { todaysSpecial, DAILY_TIP_BONUS, DAILY_GRADE, seededRandom, triesLeft } from '../data/daily.js';
 import { GRADES, MAX_GRADE, GRADE_TIP_BONUS, gradeRules, mergeRules } from '../data/grades.js';
 import { CARDS, CARD_WAVES, emptyCardFx, addCardFx } from '../data/cards.js';
 
@@ -142,6 +142,11 @@ export default class GameScene extends Phaser.Scene {
     this.pickedCards = []; // 고른 카드 목록
     // 무작위 값들. 종류별로 따로 둔다 (🏆 오늘의 도전에서는 날짜로 정해진 값이 나오게 바꾼다)
     this.rng = { summon: Math.random, wave: Math.random, cards: Math.random, merge: Math.random };
+    if (this.daily) {
+      // 🏆 오늘의 도전: 모두 같은 운. 몇 번째 뽑기·카드·합성인지가 같으면 같은 결과가 나온다
+      const seed = this.daily.seed;
+      this.rng = { summon: seededRandom(seed + 1), wave: Math.random, cards: seededRandom(seed + 3), merge: seededRandom(seed + 4) };
+    }
     this.time.paused = false;
     this.gameSpeed = this.registry.get('gameSpeed') ?? 1; // 다시 하기를 눌러도 배속 유지
 
@@ -362,6 +367,8 @@ export default class GameScene extends Phaser.Scene {
   startWave(wave) {
     this.wave = wave;
     this.waveElapsed = 0;
+    // 🏆 오늘의 도전: 웨이브마다 나오는 주문도 모두 같게 (웨이브 번호로 씨앗을 정한다)
+    if (this.daily) this.rng.wave = seededRandom(this.daily.seed + 1000 + wave);
     // 🏦 적금 카드: 웨이브마다 이자
     if (wave > 1 && this.cardFx.interest) {
       const interest = Math.min(30, Math.floor(this.gold * this.cardFx.interest));
@@ -371,7 +378,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     // 📜 정해진 웨이브마다 레시피 카드 고르기
-    if (CARD_WAVES.includes(wave)) this.time.delayedCall(0, () => this.offerCards());
+    if (CARD_WAVES.includes(wave)) this.offerCards();
     const bossKey = BOSS_WAVES[wave];
 
     // 이번 웨이브에 나올 주문들을 미리 정해 두고, SPAWN_SPREAD초 동안 고르게 나눠서 내보낸다
@@ -385,8 +392,8 @@ export default class GameScene extends Phaser.Scene {
       this.spawnQueue.push({ at: (SPAWN_SPREAD * i) / count, type: pickWeighted(mix, this.rng.wave) });
     }
     // 🥚 아주 가끔: 황금 주문, 첫 웨이브의 GG 주문
-    if (wave > 1 && Math.random() < GOLDEN_ORDER_CHANCE) {
-      this.spawnQueue.push({ at: Math.random() * SPAWN_SPREAD, type: 'salad', options: { golden: true } });
+    if (wave > 1 && this.rng.wave() < GOLDEN_ORDER_CHANCE) {
+      this.spawnQueue.push({ at: this.rng.wave() * SPAWN_SPREAD, type: 'salad', options: { golden: true } });
     }
     if (wave === 1 && Math.random() < GG_CHANCE) this.spawnQueue.push({ at: 0.5, type: 'gg' });
     this.spawnQueue.sort((a, b) => a.at - b.at);
@@ -401,7 +408,7 @@ export default class GameScene extends Phaser.Scene {
       if (wave > 1) sfx.wave();
       if (wave === 1 && this.daily) {
         const sp = this.daily.special;
-        this.showBanner(`🍽️ 오늘의 특선\n${sp.emoji} ${sp.name}`, COLORS.gold, 44);
+        this.showBanner(`🏆 오늘의 도전\n${sp.emoji} ${sp.name}`, COLORS.gold, 44);
         this.log(`🍽️ ${sp.name}: ${sp.desc}`, COLORS.gold);
       } else if (wave === 1) {
         const g = GRADES[this.grade - 1];
@@ -1356,13 +1363,18 @@ export default class GameScene extends Phaser.Scene {
 
     // 버튼은 알림 줄 수에 맞춰 그 아래에 놓는다
     const buttonY = Math.max(centerY + 230, y + 100);
-    createButton(this, centerX, buttonY, 360, 100, '다시 하기', () => this.restartRun()).setDepth(depth);
+    const left = this.daily ? triesLeft() : null;
+    const retry = createButton(this, centerX, buttonY, 360, 100, this.daily ? `다시 도전 (남은 ${left}번)` : '다시 하기', () => this.restartRun(), {
+      fontSize: this.daily ? 30 : 34,
+    }).setDepth(depth);
+    if (this.daily && left <= 0) retry.setLabel('오늘 도전 끝! 내일 또 만나요').setEnabled(false);
     if (this.daily) createButton(this, centerX, buttonY + 115, 360, 100, '처음으로', () => this.scene.start('Title')).setDepth(depth);
     else createButton(this, centerX, buttonY + 115, 360, 100, '주방 선택', () => this.scene.start('KitchenSelect')).setDepth(depth);
   }
 
   // 같은 판을 처음부터 다시 (오늘의 특선이면 특선으로)
   restartRun() {
+    if (this.daily) return this.scene.start('Title', { startDaily: true }); // 도전 횟수 확인은 첫 화면에서
     this.scene.restart(this.daily ? { daily: true } : { kitchen: this.kitchen.id, grade: this.grade });
   }
 

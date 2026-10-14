@@ -29,10 +29,10 @@ export default class RankingScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
 
-    // 탭: 오늘의 특선(일일 랭킹) + 주방 4곳
+    // 탭: 오늘의 도전(일일 랭킹) + 주방 4곳
     const daily = todaysSpecial();
     const boards = [
-      { id: daily.boardId, emoji: '🍽️', name: '오늘의 특선' },
+      { id: daily.boardId, emoji: '🏆', name: '오늘의 도전' },
       ...KITCHENS.map((k) => ({ id: k.id, emoji: k.emoji, name: k.name })),
     ];
     const tabWidth = (GAME_WIDTH - 40) / boards.length;

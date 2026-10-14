@@ -3,19 +3,19 @@ import { GAME_WIDTH, GAME_HEIGHT, COLORS, FONT, EMOJI_FONT } from '../config.js'
 import { createButton } from '../ui.js';
 import { getSave, totalStars } from '../save.js';
 import { playMusic, isOn, toggle } from '../audio.js';
-import { todaysSpecial, DAILY_TIP_BONUS } from '../data/daily.js';
+import { todaysSpecial, DAILY_TIP_BONUS, DAILY_TRIES, triesLeft, useTry } from '../data/daily.js';
 import { cloudStatus, linkedAccount, linkGoogle, onCloudChange } from '../cloud.js';
 import { canFullscreen, isFullscreen, toggleFullscreen } from '../fullscreen.js';
 
 const TAB_BAR_HEIGHT = 130;
 
-// 첫 화면: 로고, 내 팁과 별, 큰 버튼 2개(영업 시작, 오늘의 특선), 아래 메뉴줄(가게, 도감, 랭킹, 설정).
+// 첫 화면: 로고, 내 팁과 별, 큰 버튼 2개(영업 시작, 오늘의 도전), 아래 메뉴줄(가게, 도감, 랭킹, 설정).
 export default class TitleScene extends Phaser.Scene {
   constructor() {
     super('Title');
   }
 
-  create() {
+  create(data) {
     const centerX = GAME_WIDTH / 2;
     const height = this.scale.height; // 휴대폰마다 다른 실제 화면 높이
     // 메뉴줄을 뺀 공간 안에서, 기준 높이보다 남는 만큼 가운데로 내린다
@@ -55,7 +55,7 @@ export default class TitleScene extends Phaser.Scene {
     // 큰 버튼 2개
     createButton(this, centerX, top + 730, 560, 140, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 48 });
     const { special } = todaysSpecial();
-    createButton(this, centerX, top + 885, 560, 120, `🍽️ 오늘의 특선\n${special.emoji} ${special.name}`, () => this.showDaily(), {
+    createButton(this, centerX, top + 885, 560, 120, `🏆 오늘의 도전 (${triesLeft()}/${DAILY_TRIES})\n${special.emoji} ${special.name}`, () => this.showDaily(), {
       fontSize: 32,
       color: 0x8e4fc0,
     });
@@ -67,6 +67,15 @@ export default class TitleScene extends Phaser.Scene {
       if (event === 'pulled') this.scene.restart();
     });
     this.events.once('shutdown', off);
+
+    // 결과 화면에서 "다시 도전"을 누르고 왔으면 바로 시작
+    if (data?.startDaily) this.startDaily();
+  }
+
+  // 🏆 오늘의 도전 시작: 남은 횟수가 있으면 한 번 쓰고 시작한다
+  startDaily() {
+    if (!useTry()) return this.showDaily();
+    this.scene.start('Game', { daily: true });
   }
 
   // 휴대폰 앱처럼 화면 맨 아래 메뉴줄: 아이콘 + 작은 글씨
@@ -182,7 +191,7 @@ export default class TitleScene extends Phaser.Scene {
     for (const p of parts) p.setDepth(20);
   }
 
-  // 🍽️ 오늘의 특선 안내 창: 오늘의 주방과 규칙을 보여 주고 시작한다
+  // 🏆 오늘의 도전 안내 창: 오늘의 주방과 특선 메뉴(규칙), 남은 횟수를 보여 주고 시작한다
   showDaily() {
     const { date, kitchen, special } = todaysSpecial();
     const centerX = GAME_WIDTH / 2;
@@ -200,19 +209,21 @@ export default class TitleScene extends Phaser.Scene {
     const parts = [
       shade,
       box,
-      text(centerY - 270, '🍽️ 오늘의 특선 메뉴', 38, COLORS.text, true),
+      text(centerY - 270, '🏆 오늘의 도전', 38, COLORS.text, true),
       text(centerY - 220, date, 22, '#b9a48f'),
       this.add.text(centerX, centerY - 130, special.emoji, { fontFamily: EMOJI_FONT, fontSize: '84px' }).setOrigin(0.5),
       text(centerY - 50, special.name, 40, COLORS.gold, true),
       text(centerY + 10, special.desc, 24),
-      text(centerY + 75, `주방: ${kitchen.emoji} ${kitchen.name}\n(잠긴 주방도 오늘은 할 수 있어요)`, 22, '#d8c8b4'),
-      text(centerY + 140, `팁 ×${DAILY_TIP_BONUS} 보너스 · 일일 랭킹에 기록`, 22, '#d8c8b4'),
+      text(centerY + 55, `주방: ${kitchen.emoji} ${kitchen.name} (잠긴 주방도 OK)`, 22, '#d8c8b4'),
+      text(centerY + 118, `🎲 오늘은 모두 같은 운! 실력으로 겨뤄요\n🏅3 등급 · 팁 ×${DAILY_TIP_BONUS} · 일일 랭킹`, 22, '#d8c8b4'),
+      text(centerY + 190, `남은 도전 ${triesLeft()} / ${DAILY_TRIES}`, 28, triesLeft() > 0 ? COLORS.gold : '#ff8a8a', true),
     ];
     const close = () => parts.forEach((p) => p.destroy());
     parts.push(
-      createButton(this, centerX - 130, centerY + 245, 220, 96, '닫기', close, { color: 0x7d8594 }),
-      createButton(this, centerX + 130, centerY + 245, 220, 96, '▶ 시작', () => this.scene.start('Game', { daily: true }), {
+      createButton(this, centerX - 130, centerY + 265, 220, 96, '닫기', close, { color: 0x7d8594 }),
+      createButton(this, centerX + 130, centerY + 265, 220, 96, triesLeft() > 0 ? '▶ 도전' : '내일 다시', () => this.startDaily(), {
         color: 0x3f9a4a,
+        enabled: triesLeft() > 0,
       }),
     );
     for (const p of parts) p.setDepth(20);

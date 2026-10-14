@@ -1,7 +1,9 @@
 import { KITCHENS } from './kitchens.js';
+import { getSave, writeSave } from '../save.js';
 
-// 🍽️ 오늘의 특선 메뉴: 날짜(한국 시간)마다 주방 하나와 특별 규칙 하나가 정해진다.
-// 같은 날에는 모든 플레이어가 같은 규칙으로 하고, 일일 랭킹에서 겨룬다.
+// 🏆 오늘의 도전: 날짜(한국 시간)마다 주방 하나와 특선 메뉴(특별 규칙) 하나가 정해진다.
+// 같은 날에는 모든 플레이어가 같은 규칙, 같은 운(뽑기·주문·카드 순서)으로 하고, 일일 랭킹에서 겨룬다.
+// 하루에 DAILY_TRIES번만 도전할 수 있다.
 //
 // rule에 넣을 수 있는 값 (없으면 평소와 같다)
 //   lineDamage   레시피 줄별 공격력 배율 { cut: 2, grill: 0.5 }
@@ -13,8 +15,9 @@ import { KITCHENS } from './kitchens.js';
 //   setPower     세트 메뉴 효과 배율
 //   tips         판 끝 팁 배율 (특선 기본 보너스에 곱한다)
 
-export const DAILY_TIP_BONUS = 1.5; // 오늘의 특선은 팁을 1.5배 더 준다
-export const DAILY_GRADE = 3; // 오늘의 특선은 모두 🏅3 등급 규칙으로 한다
+export const DAILY_TIP_BONUS = 1.5; // 오늘의 도전은 팁을 1.5배 더 준다
+export const DAILY_GRADE = 3; // 오늘의 도전은 모두 🏅3 등급 규칙으로 한다
+export const DAILY_TRIES = 3; // 하루 도전 횟수
 
 export const DAILY_RULES = [
   { id: 'bread', emoji: '🍞', name: '빵의 날', desc: '🍞 빵 줄 공격력 2배, 🍖 고기 줄 절반', rule: { lineDamage: { cut: 2, grill: 0.5 } } },
@@ -43,7 +46,7 @@ function hash(text) {
   return h >>> 0;
 }
 
-// 오늘의 특선: { date, kitchen, special(DAILY_RULES 항목), boardId(랭킹 이름) }
+// 오늘의 도전: { date, kitchen, special(DAILY_RULES 항목), boardId(랭킹 이름), seed(같은 운을 만드는 숫자) }
 // 규칙은 9일 동안 9가지가 한 번씩 돌아가며 나온다 (이틀 연속 같은 규칙이 없다). 주방은 날짜 해시로 정한다.
 export function todaysSpecial(date = new Date()) {
   const key = todayKey(date);
@@ -53,5 +56,38 @@ export function todaysSpecial(date = new Date()) {
     kitchen: KITCHENS[hash(key) % KITCHENS.length],
     special: DAILY_RULES[(day * 4 + 2) % DAILY_RULES.length],
     boardId: `daily_${key.replaceAll('-', '')}`,
+    seed: hash(`cookcook-${key}`),
   };
+}
+
+// ───────── 같은 운 ─────────
+
+// 씨앗(seed) 숫자가 같으면 항상 같은 순서로 나오는 무작위 값 (0 이상 1 미만). mulberry32
+export function seededRandom(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ───────── 하루 도전 횟수 ─────────
+
+export function triesLeft() {
+  const record = getSave().daily;
+  const used = record?.date === todayKey() ? record.tries : 0;
+  return Math.max(0, DAILY_TRIES - used);
+}
+
+// 도전 한 번 쓰기. 남은 횟수가 없으면 false
+export function useTry() {
+  if (triesLeft() <= 0) return false;
+  const save = getSave();
+  const today = todayKey();
+  save.daily = { date: today, tries: (save.daily?.date === today ? save.daily.tries : 0) + 1 };
+  writeSave();
+  return true;
 }
