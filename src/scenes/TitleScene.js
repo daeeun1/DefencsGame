@@ -46,12 +46,12 @@ export default class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    createButton(this, centerX, top + 800, 400, 110, '🔥 영업 시작', () => this.scene.start('Game'), { fontSize: 38 });
+    createButton(this, centerX, top + 800, 400, 110, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 38 });
     createButton(this, centerX, top + 930, 400, 100, '🏪 가게 강화', () => this.scene.start('Shop'));
     createButton(this, centerX, top + 1050, 400, 100, '📖 요리사 도감', () => this.scene.start('Codex'));
 
     this.add
-      .text(centerX, height - 50, 'v0.7 · 개발 중', {
+      .text(centerX, height - 50, 'v0.8 · 개발 중', {
         fontFamily: FONT,
         fontSize: '22px',
         color: '#b9a48f',

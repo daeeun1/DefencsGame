@@ -23,8 +23,6 @@ export function boardTop(screenHeight) {
 
 export const COLORS = {
   background: 0x2b1d14, // 주방 바닥 (진한 갈색)
-  floorTile: 0xf3e3c3, // 요리사 자리 (밝은 베이지)
-  floorTileAlt: 0xe8d3ab, // 체크무늬용 두 번째 색
   rail: 0x5b6470, // 회전 레일 (금속 회색)
   railStripe: 0x7d8794, // 레일 줄무늬
   hud: 0x3d2a1e, // 정보 표시줄 배경

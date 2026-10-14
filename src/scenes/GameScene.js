@@ -37,13 +37,13 @@ import Chef from '../objects/Chef.js';
 import Projectile from '../objects/Projectile.js';
 import UpgradePanel from '../panels/UpgradePanel.js';
 import RecipePanel from '../panels/RecipePanel.js';
+import { KITCHENS, kitchenById } from '../data/kitchens.js';
 import { getSave, writeSave, totalStars, shopLevel, codexLevel, discover } from '../save.js';
 import {
   SHOP_ITEMS,
   STAR_RULES,
   TIPS_PER_ORDER,
   TIPS_PER_STAR,
-  DEFAULT_KITCHEN,
   RECIPE_UNLOCK_STARS,
   CODEX_DAMAGE_PER_LEVEL,
 } from '../data/progress.js';
@@ -70,7 +70,10 @@ export default class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create() {
+  // data.kitchen: 고른 주방 id (주방 선택 화면에서 넘어온다)
+  create(data) {
+    this.kitchen = kitchenById(data?.kitchen ?? this.registry.get('kitchen'));
+    this.registry.set('kitchen', this.kitchen.id);
     this.screenHeight = this.scale.height; // 휴대폰마다 다른 실제 화면 높이
     this.boardY = boardTop(this.screenHeight);
 
@@ -85,6 +88,10 @@ export default class GameScene extends Phaser.Scene {
     this.chefs = [];
     this.projectiles = [];
     this.freezeTimeLeft = 0; // 디저트 마녀가 레일을 멈춘 남은 시간
+    this.gimmickTimer = 0; // 주방 기믹이 다음에 발동할 때까지 쌓이는 시간
+    this.rushTimeLeft = 0; // 회전초밥집: 레일이 빨라진 남은 시간
+    this.fires = []; // 불난 중식당: 불붙은 칸들 { slot, timeLeft, icon }
+    this.blackout = null; // 정전된 레스토랑: { slots, timeLeft }
     // 가게 강화(영구 성장) 효과를 이번 판에 적용
     this.gold = START_GOLD + shopBonus('startGold');
     this.railLimit = RAIL_LIMIT + shopBonus('railCapacity');
@@ -146,11 +153,13 @@ export default class GameScene extends Phaser.Scene {
     if (this.boss) this.bossAbility(dt);
 
     // 3) 주문 이동 + 지속 피해. 레일이 멈춰 있으면 일반 주문은 서 있고, 보스는 절반 속도
+    this.updateGimmick(dt);
     this.freezeTimeLeft = Math.max(0, this.freezeTimeLeft - dt);
     const frozen = this.freezeTimeLeft > 0;
     this.freezeOverlay.setVisible(frozen);
+    const rush = this.rushTimeLeft > 0 ? this.kitchen.gimmick.factor : 1;
     for (const order of [...this.orders]) {
-      const moveScale = frozen ? (order.isBoss ? 0.5 : 0) : 1;
+      const moveScale = (frozen ? (order.isBoss ? 0.5 : 0) : 1) * rush;
       const dotDamage = order.step(dt, moveScale);
       if (dotDamage > 0) this.damageOrder(order, dotDamage);
     }
@@ -159,6 +168,10 @@ export default class GameScene extends Phaser.Scene {
     const dragging = this.drag && this.drag.moved ? this.drag.chef : null;
     for (const chef of this.chefs) {
       if (chef === dragging) continue; // 끌려가는 중에는 공격하지 않는다
+      const burning = this.fires.some((f) => f.slot === chef.slot);
+      chef.setAlpha(burning ? 0.45 : 1);
+      if (burning) continue; // 불붙은 칸의 요리사는 쉰다
+      chef.rangeScale = this.blackout?.slots.includes(chef.slot) ? this.kitchen.gimmick.rangeFactor : 1;
       chef.step(dt, this.orders, (c, target) => this.attack(c, target));
       if (chef.stats.freeze) this.freezeAbility(chef, dt);
     }
@@ -199,7 +212,8 @@ export default class GameScene extends Phaser.Scene {
       this.showBanner(`⚠ VIP 손님 등장!\n${ORDER_TYPES[bossKey].emoji} ${ORDER_TYPES[bossKey].name}`, COLORS.danger, 44);
     } else {
       this.waveTimeLeft = WAVE_DURATION;
-      this.showBanner(`웨이브 ${wave}`);
+      if (wave === 1) this.showBanner(`${this.kitchen.emoji} ${this.kitchen.name}\n${this.kitchen.desc}`, COLORS.textDark, 40);
+      else this.showBanner(`웨이브 ${wave}`);
     }
   }
 
@@ -274,6 +288,72 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.waveTimeLeft = Math.min(this.waveTimeLeft, 1); // 1초 뒤 다음 웨이브
     }
+  }
+
+  // ───────── 주방 기믹 ─────────
+
+  updateGimmick(dt) {
+    // 진행 중인 효과의 남은 시간 줄이기
+    this.rushTimeLeft = Math.max(0, this.rushTimeLeft - dt);
+    this.rushOverlay.setVisible(this.rushTimeLeft > 0);
+    for (const fire of this.fires) fire.timeLeft -= dt;
+    for (const fire of this.fires.filter((f) => f.timeLeft <= 0)) fire.icon.destroy();
+    this.fires = this.fires.filter((f) => f.timeLeft > 0);
+    if (this.blackout) {
+      this.blackout.timeLeft -= dt;
+      if (this.blackout.timeLeft <= 0) {
+        this.blackout = null;
+        this.darkOverlay.clear();
+      }
+    }
+
+    // 일정 시간마다 기믹 발동
+    const gimmick = this.kitchen.gimmick;
+    if (!gimmick) return;
+    this.gimmickTimer += dt;
+    if (this.gimmickTimer < gimmick.every) return;
+    this.gimmickTimer = 0;
+
+    if (gimmick.type === 'rush') {
+      this.rushTimeLeft = gimmick.duration;
+      this.showBanner('🍣 레일 가속!', COLORS.danger, 48);
+    } else if (gimmick.type === 'fire') {
+      this.startFire(gimmick.duration);
+    } else if (gimmick.type === 'blackout') {
+      this.startBlackout(gimmick.duration);
+    }
+  }
+
+  // 불난 중식당: 요리사가 있는 칸 중 하나에 불을 붙인다 (없으면 아무 칸)
+  startFire(duration) {
+    const burning = this.fires.map((f) => f.slot);
+    const withChef = this.slots.filter((s) => s.chef && !burning.includes(s));
+    const candidates = withChef.length > 0 ? withChef : this.slots.filter((s) => !burning.includes(s));
+    const slot = Phaser.Utils.Array.GetRandom(candidates);
+    if (!slot) return;
+    // 굽기 요리사(🔥)와 헷갈리지 않게: 칸 전체를 빨갛게 칠하고, 구석에 작은 불꽃을 둔다
+    const glow = this.add.rectangle(0, 0, TILE, TILE, 0xff3b1f, 0.45);
+    const flame = this.add.text(TILE / 2 - 18, -TILE / 2 + 18, '🔥', { fontFamily: FONT, fontSize: '30px' }).setOrigin(0.5);
+    const icon = this.add.container(slot.x, slot.y, [glow, flame]);
+    this.effectLayer.add(icon);
+    this.tweens.add({ targets: glow, alpha: 0.2, duration: 350, yoyo: true, repeat: -1 });
+    this.fires.push({ slot, timeLeft: duration, icon });
+  }
+
+  // 정전된 레스토랑: 판의 위/아래/왼쪽/오른쪽 절반 중 하나가 어두워진다
+  startBlackout(duration) {
+    const half = Phaser.Utils.Array.GetRandom(['top', 'bottom', 'left', 'right']);
+    const slots = this.slots.filter((s) => {
+      if (half === 'top') return s.row < INNER_ROWS / 2;
+      if (half === 'bottom') return s.row >= INNER_ROWS / 2;
+      if (half === 'left') return s.col < INNER_COLS / 2;
+      return s.col >= INNER_COLS / 2;
+    });
+    this.blackout = { slots, timeLeft: duration };
+    this.darkOverlay.clear();
+    this.darkOverlay.fillStyle(0x000000, 0.55);
+    for (const s of slots) this.darkOverlay.fillRect(s.x - TILE / 2, s.y - TILE / 2, TILE, TILE);
+    this.showBanner('💡 정전!', '#c4bfd6', 52);
   }
 
   // ───────── 요리사 ─────────
@@ -645,24 +725,25 @@ export default class GameScene extends Phaser.Scene {
     ).setLineSpacing(6);
 
     let y = centerY + 20;
-    text(y, `🪙 팁 +${rewards.tips}  (주문 ${this.ordersServed}개 · 별 ${rewards.stars}개)`, 28, COLORS.gold, true);
+    const bonus = this.kitchen.tipBonus > 1 ? ` · ×${this.kitchen.tipBonus}` : '';
+    text(y, `🪙 팁 +${rewards.tips}  (주문 ${this.ordersServed}개 · 별 ${rewards.stars}개${bonus})`, 26, COLORS.gold, true);
     if (rewards.newBest) text((y += 45), '🏆 새 최고 기록!', 28, COLORS.gold, true);
-    for (const name of rewards.unlocked) text((y += 45), `🔓 신화 레시피 해금: ${name}`, 26, '#ff8a8a', true);
+    for (const message of rewards.unlocked) text((y += 45), `🔓 ${message}`, 26, '#ff8a8a', true);
 
-    createButton(this, centerX, centerY + 230, 360, 100, '다시 하기', () => this.scene.restart()).setDepth(depth);
-    createButton(this, centerX, centerY + 345, 360, 100, '처음으로', () => this.scene.start('Title')).setDepth(depth);
+    createButton(this, centerX, centerY + 230, 360, 100, '다시 하기', () => this.scene.restart({ kitchen: this.kitchen.id })).setDepth(depth);
+    createButton(this, centerX, centerY + 345, 360, 100, '주방 선택', () => this.scene.start('KitchenSelect')).setDepth(depth);
   }
 
   // 판 끝 보상: 별과 팁을 계산해서 저장한다
   giveRewards() {
     const save = getSave();
     const stars = Math.min(3, this.bossesDefeated);
-    const tips = this.ordersServed * TIPS_PER_ORDER + stars * TIPS_PER_STAR;
+    const tips = Math.round((this.ordersServed * TIPS_PER_ORDER + stars * TIPS_PER_STAR) * this.kitchen.tipBonus);
 
     const starsBefore = totalStars();
-    const best = save.bestStars[DEFAULT_KITCHEN] ?? 0;
+    const best = save.bestStars[this.kitchen.id] ?? 0;
     const newBest = stars > best;
-    if (newBest) save.bestStars[DEFAULT_KITCHEN] = stars;
+    if (newBest) save.bestStars[this.kitchen.id] = stars;
     save.tips += tips;
     save.runs += 1;
     writeSave();
@@ -672,7 +753,11 @@ export default class GameScene extends Phaser.Scene {
     const unlocked = RECIPES.filter((r) => {
       const need = RECIPE_UNLOCK_STARS[r.result];
       return starsBefore < need && starsAfter >= need;
-    }).map((r) => chefById(r.result).name);
+    }).map((r) => `신화 레시피 해금: ${chefById(r.result).name}`);
+    // 이번 판으로 새로 열린 주방
+    for (const k of KITCHENS) {
+      if (starsBefore < k.unlockStars && starsAfter >= k.unlockStars) unlocked.push(`새 주방 해금: ${k.emoji} ${k.name}`);
+    }
 
     return { stars, tips, newBest, unlocked };
   }
@@ -689,13 +774,26 @@ export default class GameScene extends Phaser.Scene {
     this.projectileLayer = this.add.layer();
     this.effectLayer = this.add.layer();
 
+    // 정전된 칸을 덮는 어두운 막 (요리사보다 위)
+    this.darkOverlay = this.add.graphics();
+
+    // 회전초밥집 레일 가속 중에 레일 위에 덮는 붉은 막
+    this.rushOverlay = this.add.graphics().setVisible(false);
+    this.rushOverlay.fillStyle(0xff5a5a, 0.25);
+    this.drawRailShape(this.rushOverlay);
+
     // 레일이 멈췄을 때 레일 위에 덮는 하늘색 얼음막
     this.freezeOverlay = this.add.graphics().setVisible(false);
     this.freezeOverlay.fillStyle(0x9fd8ff, 0.35);
-    this.freezeOverlay.fillRect(BOARD_X, this.boardY, BOARD_COLS * TILE, TILE);
-    this.freezeOverlay.fillRect(BOARD_X, this.boardY + (BOARD_ROWS - 1) * TILE, BOARD_COLS * TILE, TILE);
-    this.freezeOverlay.fillRect(BOARD_X, this.boardY + TILE, TILE, (BOARD_ROWS - 2) * TILE);
-    this.freezeOverlay.fillRect(BOARD_X + (BOARD_COLS - 1) * TILE, this.boardY + TILE, TILE, (BOARD_ROWS - 2) * TILE);
+    this.drawRailShape(this.freezeOverlay);
+  }
+
+  // 레일 모양(판 테두리 한 줄)을 채워 그린다
+  drawRailShape(g) {
+    g.fillRect(BOARD_X, this.boardY, BOARD_COLS * TILE, TILE);
+    g.fillRect(BOARD_X, this.boardY + (BOARD_ROWS - 1) * TILE, BOARD_COLS * TILE, TILE);
+    g.fillRect(BOARD_X, this.boardY + TILE, TILE, (BOARD_ROWS - 2) * TILE);
+    g.fillRect(BOARD_X + (BOARD_COLS - 1) * TILE, this.boardY + TILE, TILE, (BOARD_ROWS - 2) * TILE);
   }
 
   // 화면 위쪽 정보 표시줄: 웨이브, 남은 시간, 레일 위 주문 수, 골드
@@ -765,7 +863,7 @@ export default class GameScene extends Phaser.Scene {
           this.drawArrow(g, x + TILE / 2, y + TILE / 2, this.railDirection(col, row));
         } else {
           const checker = (col + row) % 2 === 0;
-          g.fillStyle(checker ? COLORS.floorTile : COLORS.floorTileAlt, 1);
+          g.fillStyle(this.kitchen.floor[checker ? 0 : 1], 1);
           g.fillRect(x, y, TILE, TILE);
         }
       }

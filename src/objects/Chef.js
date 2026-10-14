@@ -15,6 +15,7 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.cooldown = 0; // 다음 공격까지 남은 시간(초)
     this.attackSpeed = 1; // 총괄 주방장 버프로 올라가는 공격 속도 배율
     this.freezeTimer = 0; // 디저트 마녀의 레일 정지 타이머
+    this.rangeScale = 1; // 사거리 배율 (정전된 레스토랑에서 어두운 칸이면 줄어든다)
 
     const tierColor = TIERS[data.tier].color;
     const circle = scene.add.circle(0, 0, RADIUS, tierColor).setStrokeStyle(5, 0x3d2a1e);
@@ -59,7 +60,7 @@ export default class Chef extends Phaser.GameObjects.Container {
     for (const order of orders) {
       if (order.dead) continue;
       const d = Phaser.Math.Distance.Between(this.x, this.y, order.x, order.y);
-      if (d <= this.data_.range && (!best || order.distance > best.distance)) best = order;
+      if (d <= this.data_.range * this.rangeScale && (!best || order.distance > best.distance)) best = order;
     }
     return best;
   }

@@ -35,6 +35,7 @@ src/
     orders.js         주문(적) 종류와 능력치
     chefs.js          요리사 목록, 등급, 조리법별 능력치, 신화 레시피
     progress.js       판 끝 보상, 가게 강화, 도감 숫자
+    kitchens.js       주방(스테이지) 목록과 기믹
   objects/
     Rail.js           회전 레일 경로 계산
     Order.js          레일 위를 도는 주문 하나 (감속, 지속 피해 포함)
@@ -45,6 +46,7 @@ src/
     RecipePanel.js    신화 레시피 창
   scenes/
     TitleScene.js     첫 화면 (제목, 팁과 별, 메뉴)
+    KitchenSelectScene.js  주방 선택 화면
     ShopScene.js      가게 강화 화면
     CodexScene.js     요리사 도감 화면
     GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 합성, 강화, 승패 판정)

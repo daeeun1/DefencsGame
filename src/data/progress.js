@@ -9,9 +9,6 @@ export const STAR_RULES = ['🧐 평론가 만족', '🤵 재벌 3세 만족', '
 export const TIPS_PER_ORDER = 1;
 export const TIPS_PER_STAR = 50;
 
-// 지금은 주방이 하나. 8단계에서 주방(스테이지)이 늘어난다
-export const DEFAULT_KITCHEN = 'snack_bar';
-
 // 신화 레시피를 쓰려면 필요한 별 개수 (모든 주방의 최고 별 합계)
 export const RECIPE_UNLOCK_STARS = { cooking_god: 1, dessert_witch: 2 };
 
