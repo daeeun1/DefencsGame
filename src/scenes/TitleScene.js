@@ -6,6 +6,7 @@ import { playMusic, isOn, toggle } from '../audio.js';
 import { todaysSpecial, DAILY_TIP_BONUS, DAILY_TRIES, triesLeft, useTry } from '../data/daily.js';
 import { cloudStatus, linkedAccount, linkGoogle, onCloudChange } from '../cloud.js';
 import { canFullscreen, isFullscreen, toggleFullscreen } from '../fullscreen.js';
+import { todaysQuests, claimQuest, canClaimBonus, claimBonus, hasQuestReward, QUEST_REWARD, QUEST_BONUS } from '../data/quests.js';
 
 const TAB_BAR_HEIGHT = 130;
 
@@ -60,6 +61,18 @@ export default class TitleScene extends Phaser.Scene {
       color: 0x8e4fc0,
     });
 
+    // 📋 오늘의 주문서 (받을 보상이 있으면 반짝)
+    const quests = todaysQuests();
+    const doneCount = quests.filter((q) => q.done).length;
+    const questButton = createButton(this, centerX, top + 1010, 560, 84, `📋 오늘의 주문서  ${doneCount}/${quests.length}`, () => this.showQuests(), {
+      fontSize: 30,
+      color: 0x3f7fd0,
+    });
+    if (hasQuestReward()) {
+      questButton.setLabel(`📋 오늘의 주문서  🎁 보상 받기!`);
+      this.tweens.add({ targets: questButton, scale: 1.05, duration: 450, yoyo: true, repeat: -1 });
+    }
+
     // 아래 메뉴줄
     this.createTabBar(height);
     // ⚙️ 설정에서 바꿀 수 있는 클라우드 상태: 클라우드에서 기록을 받아 오면 화면을 다시 그린다
@@ -70,6 +83,7 @@ export default class TitleScene extends Phaser.Scene {
 
     // 결과 화면에서 "다시 도전"을 누르고 왔으면 바로 시작
     if (data?.startDaily) this.startDaily();
+    if (data?.showQuests) this.showQuests();
   }
 
   // 🏆 오늘의 도전 시작: 남은 횟수가 있으면 한 번 쓰고 시작한다
@@ -102,6 +116,59 @@ export default class TitleScene extends Phaser.Scene {
         tab.onClick();
       });
     });
+  }
+
+  // 📋 오늘의 주문서 창: 퀘스트 3개, 진행 막대, 보상 받기
+  showQuests() {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = this.scale.height / 2;
+    const parts = [];
+    const shade = this.add.rectangle(0, 0, GAME_WIDTH, this.scale.height, 0x000000, 0.7).setOrigin(0).setInteractive();
+    const box = this.add.graphics();
+    box.fillStyle(0x3d2a1e, 1);
+    box.fillRoundedRect(centerX - 310, centerY - 380, 620, 760, 24);
+    box.lineStyle(5, 0x3f7fd0, 1);
+    box.strokeRoundedRect(centerX - 310, centerY - 380, 620, 760, 24);
+    parts.push(
+      shade,
+      box,
+      this.add.text(centerX, centerY - 320, '📋 오늘의 주문서', { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5),
+      this.add.text(centerX, centerY - 270, '매일 바뀌어요 · 다 하면 보너스!', { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' }).setOrigin(0.5),
+    );
+    todaysQuests().forEach((q, i) => {
+      const y = centerY - 175 + i * 150;
+      const card = this.add.graphics();
+      card.fillStyle(0x2b1d14, 1);
+      card.fillRoundedRect(centerX - 285, y - 60, 570, 125, 18);
+      const bar = this.add.graphics();
+      bar.fillStyle(0x5a4a3e, 1);
+      bar.fillRoundedRect(centerX - 200, y + 22, 260, 18, 9);
+      bar.fillStyle(q.done ? 0x6dc04a : 0xffd54f, 1);
+      bar.fillRoundedRect(centerX - 200, y + 22, Math.max(18, (260 * q.progress) / q.target), 18, 9);
+      parts.push(
+        card,
+        bar,
+        this.add.text(centerX - 245, y, q.emoji, { fontFamily: EMOJI_FONT, fontSize: '48px' }).setOrigin(0.5),
+        this.add.text(centerX - 200, y - 22, q.text, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0, 0.5),
+        this.add.text(centerX + 70, y + 31, `${q.progress}/${q.target}`, { fontFamily: FONT, fontSize: '20px', color: '#d8c8b4' }).setOrigin(0, 0.5),
+      );
+      const label = q.claimed ? '✅ 받음' : q.done ? `🪙 ${QUEST_REWARD} 받기` : `🪙 ${QUEST_REWARD}`;
+      const button = createButton(this, centerX + 205, y + 10, 140, 70, label, () => {
+        // 받으면 팁 숫자를 다시 그리고 창을 다시 연다
+        if (claimQuest(q.id) > 0) this.scene.restart({ showQuests: true });
+      }, { fontSize: 22, color: 0x3f9a4a, enabled: q.done && !q.claimed });
+      parts.push(button);
+    });
+
+    const bonusReady = canClaimBonus();
+    parts.push(
+      createButton(this, centerX, centerY + 270, 460, 80, bonusReady ? `🎁 모두 완료 보너스 🪙${QUEST_BONUS} 받기` : `🎁 3개 다 하면 🪙${QUEST_BONUS} 보너스`, () => {
+        if (claimBonus() > 0) this.scene.restart({ showQuests: true });
+      }, { fontSize: 24, color: 0xc77d2e, enabled: bonusReady }),
+    );
+    const close = () => parts.forEach((p) => p.destroy());
+    parts.push(createButton(this, centerX, centerY + 340, 240, 64, '닫기', close, { fontSize: 26, color: 0x7d8594 }));
+    for (const p of parts) p.setDepth(20);
   }
 
   // ⚙️ 설정 창: 소리, 진동, 전체 화면, 클라우드 저장과 구글 계정 연결

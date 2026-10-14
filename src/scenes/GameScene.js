@@ -66,6 +66,7 @@ import { submitScore } from '../cloud.js';
 import { todaysSpecial, DAILY_TIP_BONUS, DAILY_GRADE, seededRandom, triesLeft } from '../data/daily.js';
 import { GRADES, MAX_GRADE, GRADE_TIP_BONUS, gradeRules, mergeRules } from '../data/grades.js';
 import { CARDS, CARD_WAVES, emptyCardFx, addCardFx } from '../data/cards.js';
+import { addQuestProgress } from '../data/quests.js';
 
 // 가게 강화 효과 = 레벨 × 한 단계당 효과
 function shopBonus(id) {
@@ -191,6 +192,7 @@ export default class GameScene extends Phaser.Scene {
 
     playMusic('game');
     this.startWave(1);
+    if (this.daily) this.quest('daily');
     this.specialDayGreeting();
   }
 
@@ -367,6 +369,7 @@ export default class GameScene extends Phaser.Scene {
   startWave(wave) {
     this.wave = wave;
     this.waveElapsed = 0;
+    if (wave > 1) this.quest('wave', wave - 1); // 📋 몇 웨이브까지 버텼는지
     // 🏆 오늘의 도전: 웨이브마다 나오는 주문도 모두 같게 (웨이브 번호로 씨앗을 정한다)
     if (this.daily) this.rng.wave = seededRandom(this.daily.seed + 1000 + wave);
     // 🏦 적금 카드: 웨이브마다 이자
@@ -487,6 +490,7 @@ export default class GameScene extends Phaser.Scene {
       this.floatText(order.x + 34, order.y - 50, `🍵+${extra}`, COLORS.gold, 20);
     }
     this.ordersServed += 1;
+    this.quest('serve');
     this.orders = this.orders.filter((o) => o !== order);
     if (order.reward > 0) this.floatText(order.x, order.y - 30, `+${order.reward}`, COLORS.gold);
     sfx.serve();
@@ -516,6 +520,7 @@ export default class GameScene extends Phaser.Scene {
 
   // VIP 손님을 처리했을 때: 마지막 보스면 클리어, 아니면 바로 다음 웨이브
   bossDefeated(boss) {
+    this.quest('boss');
     this.boss = null;
     this.bossesDefeated += 1;
     this.showBanner(`🎉 ${boss.type.name} 만족!`, COLORS.gold, 44);
@@ -630,6 +635,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.gold -= cost;
     this.summonCount += 1;
+    this.quest('summon');
     if (this.cardFx.freeSummons > 0) this.cardFx.freeSummons -= 1; // 🎲 인력소 쿠폰
 
     const rnd = this.rng.summon;
@@ -763,6 +769,27 @@ export default class GameScene extends Phaser.Scene {
     this.updateHud();
   }
 
+  // ───────── 📋 오늘의 주문서 ─────────
+
+  // 퀘스트 진행. 다 하면 화면 위에 알림
+  quest(event, amount = 1) {
+    for (const q of addQuestProgress(event, amount)) {
+      const toast = this.add
+        .text(GAME_WIDTH / 2, this.layout.gauge.y + 70, `📋 주문서 완료! ${q.emoji} ${q.text}`, {
+          fontFamily: FONT,
+          fontSize: '24px',
+          fontStyle: 'bold',
+          color: COLORS.gold,
+          backgroundColor: '#2b1d14',
+          padding: { x: 16, y: 10 },
+        })
+        .setOrigin(0.5)
+        .setDepth(15);
+      sfx.coin();
+      this.tweens.add({ targets: toast, alpha: 0, delay: 2200, duration: 500, onComplete: () => toast.destroy() });
+    }
+  }
+
   // ───────── 📜 레시피 카드 ─────────
 
   // 카드 3장을 보여 주고, 하나 고를 때까지 게임을 멈춘다
@@ -838,7 +865,7 @@ export default class GameScene extends Phaser.Scene {
     sfx.upgrade();
     this.showBanner(`${card.emoji} ${card.name}!${extra}`, COLORS.gold, 40);
     this.log(`[카드] ${card.emoji} ${card.name}: ${card.desc}`, COLORS.gold);
-    this.quest?.('card');
+    this.quest('card');
     this.updateBuffs();
     this.updateHud();
   }
@@ -966,6 +993,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.drawSetLinks(links, fullCourses);
+
+    // 📋 새로 이어진 세트 연결 수 (같은 두 칸의 같은 세트는 한 번만 센다)
+    const keys = new Set(links.map((l) => `${l.a.slot.col},${l.a.slot.row}-${l.b.slot.col},${l.b.slot.row}-${l.set.id}`));
+    const fresh = [...keys].filter((k) => !this.linkKeys?.has(k)).length;
+    this.linkKeys = keys;
+    if (fresh > 0) this.quest('set', fresh);
 
     // 새로 생긴 세트 알림
     const active = new Set(links.map((l) => l.set.id));
@@ -1126,6 +1159,8 @@ export default class GameScene extends Phaser.Scene {
     this.removeChef(target);
 
     this.addChef(data, slot);
+    this.quest('merge');
+    if (data.tier === 4) this.quest('legend');
     ring(this, this.effectLayer, slot.x, slot.y, 0xfff8ec, 70);
     revealEffect(this, this.effectLayer, slot.x, slot.y, data.tier, TIERS[data.tier].color);
     vibrate(30);
