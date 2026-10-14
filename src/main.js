@@ -25,6 +25,15 @@ async function loadFonts() {
   }
 }
 
+// 게임 세로 길이: 가로는 항상 720으로 두고, 휴대폰 화면이 길쭉한 만큼 세로를 늘린다 (최소 1280).
+// 화면이 이보다 넓으면 양옆에 같은 폭의 여백이 생기고 게임은 가운데에 온다.
+function gameHeight() {
+  const box = document.getElementById('game');
+  const width = box.clientWidth || window.innerWidth;
+  const height = box.clientHeight || window.innerHeight;
+  return Math.max(GAME_HEIGHT, Math.round((GAME_WIDTH * height) / width));
+}
+
 function startGame() {
   // 게임의 시작점. 화면 크기와 장면(Scene) 목록을 정한다.
   const game = new Phaser.Game({
@@ -32,10 +41,10 @@ function startGame() {
     parent: 'game',
     backgroundColor: COLORS.background,
     scale: {
-      mode: Phaser.Scale.EXPAND, // 휴대폰 화면이 더 길면 세로를 늘려서 빈 공간 없이 채운다
+      mode: Phaser.Scale.FIT, // 비율을 지킨 채 화면에 맞추고, 남는 곳은 여백으로 둔다
       autoCenter: Phaser.Scale.CENTER_BOTH,
       width: GAME_WIDTH,
-      height: GAME_HEIGHT,
+      height: gameHeight(),
     },
     scene: [BootScene, TitleScene, KitchenSelectScene, GameScene, ShopScene, CodexScene, RankingScene], // 첫 번째 장면이 가장 먼저 열린다
   });
