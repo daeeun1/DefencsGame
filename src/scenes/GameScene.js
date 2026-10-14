@@ -31,6 +31,7 @@ import {
 import { METHODS, TIERS, WEAKNESS_MULTIPLIER, RECIPES, chefById, chefsOfTier } from '../data/chefs.js';
 import { ORDER_TYPES } from '../data/orders.js';
 import { createButton } from '../ui.js';
+import { ORDER_COLORS, burst, revealEffect, ring, shake, flash, vibrate, confetti } from '../effects.js';
 import Rail from '../objects/Rail.js';
 import Order from '../objects/Order.js';
 import Chef from '../objects/Chef.js';
@@ -226,6 +227,8 @@ export default class GameScene extends Phaser.Scene {
 
     if (order.isBoss) {
       this.boss = order;
+      shake(this, 0.01, 400);
+      vibrate([80, 40, 80]);
       this.bossRushTimer = 0;
       order.on('weaknessChanged', (method) => {
         this.floatText(order.x, order.y - 70, `약점 변경! ${METHODS[method].emoji}`, COLORS.danger, 30);
@@ -260,6 +263,7 @@ export default class GameScene extends Phaser.Scene {
     this.ordersServed += 1;
     this.orders = this.orders.filter((o) => o !== order);
     if (order.reward > 0) this.floatText(order.x, order.y - 30, `+${order.reward}`, COLORS.gold);
+    burst(this, this.effectLayer, order.x, order.y, ORDER_COLORS[order.typeKey] ?? [0xfff8ec], order.isBoss ? 30 : 7, order.isBoss ? 2 : 1);
 
     // 단체 도시락: 그 자리에서 주먹밥 여러 개로 나뉜다
     const split = order.type.splitInto;
@@ -283,6 +287,8 @@ export default class GameScene extends Phaser.Scene {
     this.boss = null;
     this.bossesDefeated += 1;
     this.showBanner(`🎉 ${boss.type.name} 만족!`, COLORS.gold, 44);
+    flash(this, 0xffd54f);
+    vibrate([60, 30, 60]);
     if (this.wave >= TOTAL_WAVES) {
       this.endGame('clear');
     } else {
@@ -393,6 +399,7 @@ export default class GameScene extends Phaser.Scene {
     const slot = Phaser.Utils.Array.GetRandom(empty);
 
     this.addChef(data, slot);
+    revealEffect(this, this.effectLayer, slot.x, slot.y, tier, TIERS[tier].color);
 
     this.floatText(slot.x, slot.y - 50, data.name, colorToHex(TIERS[tier].color), 24);
     if (tier >= 2) this.showBanner(`✨ ${TIERS[tier].name}! ${data.name}`, colorToHex(TIERS[tier].color), 44);
@@ -436,6 +443,8 @@ export default class GameScene extends Phaser.Scene {
     chef.freezeTimer = 0;
     this.freezeTimeLeft = Math.max(this.freezeTimeLeft, freeze.duration);
     this.showBanner('⏳ 시간 정지!', '#9fd8ff', 52);
+    flash(this, 0x9fd8ff);
+    shake(this, 0.004, 200);
   }
 
   // 요리사가 이 주문에 주는 피해: 기본 공격력 × 강화 배율 × 약점이면 1.5배
@@ -506,6 +515,8 @@ export default class GameScene extends Phaser.Scene {
     for (const chef of ingredients) this.removeChef(chef);
     const data = chefById(recipe.result);
     this.addChef(data, slot);
+    flash(this, 0xffd54f);
+    revealEffect(this, this.effectLayer, slot.x, slot.y, 5, TIERS[5].color);
 
     this.recipePanel.close();
     this.showBanner(`🌈 신화 탄생!\n${data.emoji} ${data.name}`, colorToHex(TIERS[5].color), 44);
@@ -623,6 +634,9 @@ export default class GameScene extends Phaser.Scene {
 
     const data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
     this.addChef(data, slot);
+    ring(this, this.effectLayer, slot.x, slot.y, 0xfff8ec, 70);
+    revealEffect(this, this.effectLayer, slot.x, slot.y, tier, TIERS[tier].color);
+    vibrate(30);
 
     const color = colorToHex(TIERS[tier].color);
     this.floatText(slot.x, slot.y - 50, data.name, color, 24);
@@ -688,6 +702,13 @@ export default class GameScene extends Phaser.Scene {
     this.updateHud();
 
     const rewards = this.giveRewards();
+    if (cleared) {
+      confetti(this, GAME_WIDTH, this.screenHeight);
+      vibrate([60, 40, 60, 40, 120]);
+    } else {
+      shake(this, 0.015, 500);
+      vibrate(250);
+    }
 
     const centerX = GAME_WIDTH / 2;
     const centerY = this.screenHeight / 2;

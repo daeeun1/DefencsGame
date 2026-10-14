@@ -19,8 +19,8 @@ export default class Chef extends Phaser.GameObjects.Container {
 
     const tierColor = TIERS[data.tier].color;
     const plate = scene.add.circle(0, 6, RADIUS, tierColor, 0.35).setStrokeStyle(3, tierColor, 0.8);
-    const sprite = scene.add.image(0, 0, `chef_${data.id}`).setScale(PIXEL_SCALE);
-    this.body_ = scene.add.container(0, 0, [plate, sprite]);
+    this.sprite = scene.add.image(0, 0, `chef_${data.id}`).setScale(PIXEL_SCALE);
+    this.body_ = scene.add.container(0, 0, [plate, this.sprite]);
 
     this.add(this.body_);
     scene.add.existing(this);
@@ -28,6 +28,17 @@ export default class Chef extends Phaser.GameObjects.Container {
     // 등장 효과: 작게 시작해서 통통 커진다
     this.body_.setScale(0.2);
     scene.tweens.add({ targets: this.body_, scale: 1, duration: 250, ease: 'Back.Out' });
+
+    // 숨 쉬듯 살짝 들썩이는 움직임 (요리사마다 박자가 조금씩 다르다)
+    scene.tweens.add({
+      targets: this.sprite,
+      y: -4,
+      duration: Phaser.Math.Between(450, 650),
+      delay: Phaser.Math.Between(0, 500),
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
   }
 
   get stats() {
@@ -50,8 +61,16 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.cooldown = this.data_.interval;
     onAttack(this, target);
 
-    // 공격할 때 살짝 튀는 효과
-    this.scene.tweens.add({ targets: this.body_, scale: 1.12, duration: 70, yoyo: true });
+    // 공격할 때 목표 쪽으로 몸을 내미는 효과
+    const angle = Phaser.Math.Angle.Between(this.x, this.y, target.x, target.y);
+    this.scene.tweens.add({
+      targets: this.body_,
+      x: Math.cos(angle) * 10,
+      y: Math.sin(angle) * 10,
+      scale: 1.08,
+      duration: 70,
+      yoyo: true,
+    });
   }
 
   // 사거리 안의 주문 중 레일을 가장 많이 나아간(가장 급한) 주문을 고른다
