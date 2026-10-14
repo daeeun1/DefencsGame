@@ -43,9 +43,8 @@ export default class CodexScene extends Phaser.Scene {
 
       const bg = this.add.graphics();
       this.add.circle(x + 45, y + CARD_H / 2, 34, found ? TIERS[chef.tier].color : 0x5a4a3e).setStrokeStyle(4, 0x2b1d14);
-      this.add
-        .text(x + 45, y + CARD_H / 2, found ? chef.emoji ?? METHODS[chef.method].emoji : '❓', { fontFamily: FONT, fontSize: '34px' })
-        .setOrigin(0.5);
+      if (found) this.add.image(x + 45, y + CARD_H / 2, `chef_${chef.id}`).setScale(4);
+      else this.add.text(x + 45, y + CARD_H / 2, '?', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: '#b9a48f' }).setOrigin(0.5);
       this.add.text(x + 88, y + 22, found ? chef.name : '???', {
         fontFamily: FONT,
         fontSize: '20px',

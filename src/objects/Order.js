@@ -1,7 +1,5 @@
 import Phaser from 'phaser';
-import { FONT } from '../config.js';
 import { ORDER_TYPES, showsWeakness } from '../data/orders.js';
-import { METHODS } from '../data/chefs.js';
 import { BASE_SPEED, orderHp, orderReward } from '../data/balance.js';
 
 const BAR_HEIGHT = 8;
@@ -38,7 +36,8 @@ export default class Order extends Phaser.GameObjects.Container {
     this.barWidth = this.isBoss ? 120 : 64;
     const barY = size * 0.7;
 
-    this.icon = scene.add.text(0, 0, this.type.emoji, { fontFamily: FONT, fontSize: `${size}px` }).setOrigin(0.5);
+    // 16 x 16 도트 그림을 크기에 맞게 키운다 (보통 4배 = 64)
+    this.icon = scene.add.image(0, 0, `order_${typeKey}`).setScale(Math.round(size / 14));
 
     // 체력 막대: 회색 바탕 위에 초록색(보스는 빨간색)이 줄어든다
     this.barBack = scene.add.rectangle(0, barY, this.barWidth, BAR_HEIGHT + (this.isBoss ? 4 : 0), 0x000000, 0.5);
@@ -50,8 +49,8 @@ export default class Order extends Phaser.GameObjects.Container {
     // 약점 표시 (까다로운 주문, 미식 대왕): 머리 위 작은 동그라미 안에 조리법 그림
     if (showsWeakness(this.type)) {
       const badgeY = -size * 0.65;
-      this.badgeCircle = scene.add.circle(size * 0.45, badgeY, 18, 0xfff8ec).setStrokeStyle(3, 0x3d2a1e);
-      this.badge = scene.add.text(size * 0.45, badgeY, '', { fontFamily: FONT, fontSize: '22px' }).setOrigin(0.5);
+      this.badgeCircle = scene.add.circle(size * 0.45, badgeY, 20, 0xfff8ec).setStrokeStyle(3, 0x3d2a1e);
+      this.badge = scene.add.image(size * 0.45, badgeY, 'tool_cut').setScale(3);
       this.add([this.badgeCircle, this.badge]);
       this.updateBadge();
     }
@@ -145,7 +144,7 @@ export default class Order extends Phaser.GameObjects.Container {
   }
 
   updateBadge() {
-    if (this.badge) this.badge.setText(METHODS[this.weakness].emoji);
+    if (this.badge) this.badge.setTexture(`tool_${this.weakness}`);
   }
 
   updateTint() {

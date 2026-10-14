@@ -1,24 +1,45 @@
 import Phaser from 'phaser';
+import fontRegularUrl from 'galmuri/dist/Galmuri11.woff2?url';
+import fontBoldUrl from 'galmuri/dist/Galmuri11-Bold.woff2?url';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from './config.js';
+import BootScene from './scenes/BootScene.js';
 import TitleScene from './scenes/TitleScene.js';
+import KitchenSelectScene from './scenes/KitchenSelectScene.js';
 import GameScene from './scenes/GameScene.js';
 import ShopScene from './scenes/ShopScene.js';
 import CodexScene from './scenes/CodexScene.js';
-import KitchenSelectScene from './scenes/KitchenSelectScene.js';
 
-// 게임의 시작점. 화면 크기와 장면(Scene) 목록을 정한다.
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game',
-  backgroundColor: COLORS.background,
-  scale: {
-    mode: Phaser.Scale.EXPAND, // 휴대폰 화면이 더 길면 세로를 늘려서 빈 공간 없이 채운다
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
-  },
-  scene: [TitleScene, KitchenSelectScene, GameScene, ShopScene, CodexScene], // 첫 번째 장면이 가장 먼저 열린다
-});
+// 도트 글꼴(갈무리)을 먼저 불러온다. 글꼴이 준비되기 전에 글씨를 그리면 다른 글꼴로 나와 버린다.
+async function loadFonts() {
+  try {
+    const faces = [
+      new FontFace('Galmuri11', `url(${fontRegularUrl})`, { weight: '400' }),
+      new FontFace('Galmuri11', `url(${fontBoldUrl})`, { weight: '700' }),
+    ];
+    await Promise.all(faces.map((face) => face.load()));
+    faces.forEach((face) => document.fonts.add(face));
+  } catch (error) {
+    console.warn('글꼴을 불러오지 못해서 기본 글꼴로 표시해요', error);
+  }
+}
 
-// 개발 중에만: 브라우저 콘솔에서 game으로 게임 상태를 들여다볼 수 있게 한다
-if (import.meta.env.DEV) window.game = game;
+function startGame() {
+  // 게임의 시작점. 화면 크기와 장면(Scene) 목록을 정한다.
+  const game = new Phaser.Game({
+    type: Phaser.AUTO,
+    parent: 'game',
+    backgroundColor: COLORS.background,
+    scale: {
+      mode: Phaser.Scale.EXPAND, // 휴대폰 화면이 더 길면 세로를 늘려서 빈 공간 없이 채운다
+      autoCenter: Phaser.Scale.CENTER_BOTH,
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+    },
+    scene: [BootScene, TitleScene, KitchenSelectScene, GameScene, ShopScene, CodexScene], // 첫 번째 장면이 가장 먼저 열린다
+  });
+
+  // 개발 중에만: 브라우저 콘솔에서 game으로 게임 상태를 들여다볼 수 있게 한다
+  if (import.meta.env.DEV) window.game = game;
+}
+
+loadFonts().then(startGame);

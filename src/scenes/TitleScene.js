@@ -15,7 +15,9 @@ export default class TitleScene extends Phaser.Scene {
     const top = (height - GAME_HEIGHT) / 2; // 기준 높이보다 긴 만큼 전체를 가운데로 내린다
     const save = getSave();
 
-    this.add.text(centerX, top + 290, '👨‍🍳', { fontSize: '150px' }).setOrigin(0.5);
+    this.add.circle(centerX, top + 300, 120, 0xf3e3c3).setStrokeStyle(8, 0xe85d3a);
+    const chef = this.add.image(centerX, top + 290, 'chef_head_chef').setScale(11);
+    this.tweens.add({ targets: chef, y: chef.y - 10, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     this.add
       .text(centerX, top + 460, '주방 디펜스', {

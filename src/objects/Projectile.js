@@ -11,13 +11,13 @@ const LOOKS = {
   all: { color: 0xffd54f, radius: 13 }, // 요리의 신: 황금빛
 };
 
-// 요리사가 주문을 향해 날리는 투사체.
+// 요리사가 주문을 향해 날리는 투사체 (도트 느낌의 네모).
 // 목표를 따라가다가 닿으면 onHit(위치)를 부른다. 목표가 먼저 사라지면 마지막 위치까지 날아간다.
-export default class Projectile extends Phaser.GameObjects.Arc {
+export default class Projectile extends Phaser.GameObjects.Rectangle {
   constructor(scene, chef, target, onHit) {
     const look = LOOKS[chef.stats.method];
-    super(scene, chef.x, chef.y, look.radius, 0, 360, false, look.color);
-    this.setStrokeStyle(2, 0x3d2a1e);
+    super(scene, chef.x, chef.y, look.radius * 1.6, look.radius * 1.6, look.color);
+    this.setStrokeStyle(3, 0x3d2a1e);
 
     this.chef = chef;
     this.target = target;

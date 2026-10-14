@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
-import { FONT } from '../config.js';
-import { METHODS, TIERS } from '../data/chefs.js';
+import { TIERS } from '../data/chefs.js';
 
-const RADIUS = 40;
+const RADIUS = 42;
+const PIXEL_SCALE = 5; // 16 x 16 도트 그림을 5배로 키워서 80 x 80으로 그린다
 
 // 주방 칸에 서 있는 요리사 하나.
-// 등급 색깔 동그라미 안에 조리법 그림이 있다.
+// 등급 색깔 받침 위에 도트 그림 요리사가 서 있다. (앞치마 색 = 등급, 손에 든 도구 = 조리법)
 export default class Chef extends Phaser.GameObjects.Container {
   constructor(scene, data, slot) {
     super(scene, slot.x, slot.y);
@@ -18,9 +18,9 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.rangeScale = 1; // 사거리 배율 (정전된 레스토랑에서 어두운 칸이면 줄어든다)
 
     const tierColor = TIERS[data.tier].color;
-    const circle = scene.add.circle(0, 0, RADIUS, tierColor).setStrokeStyle(5, 0x3d2a1e);
-    const icon = scene.add.text(0, -2, data.emoji ?? METHODS[data.method].emoji, { fontFamily: FONT, fontSize: '42px' }).setOrigin(0.5);
-    this.body_ = scene.add.container(0, 0, [circle, icon]);
+    const plate = scene.add.circle(0, 6, RADIUS, tierColor, 0.35).setStrokeStyle(3, tierColor, 0.8);
+    const sprite = scene.add.image(0, 0, `chef_${data.id}`).setScale(PIXEL_SCALE);
+    this.body_ = scene.add.container(0, 0, [plate, sprite]);
 
     this.add(this.body_);
     scene.add.existing(this);

@@ -44,10 +44,20 @@ src/
   panels/
     UpgradePanel.js   등급별 강화 창
     RecipePanel.js    신화 레시피 창
+  art/
+    sprites.js        도트 그림 데이터 (글자 하나 = 점 하나)
+    textures.js       도트 그림 데이터를 실제 그림으로 바꾸기
   scenes/
+    BootScene.js      가장 먼저 열려서 도트 그림을 준비
     TitleScene.js     첫 화면 (제목, 팁과 별, 메뉴)
     KitchenSelectScene.js  주방 선택 화면
     ShopScene.js      가게 강화 화면
     CodexScene.js     요리사 도감 화면
     GameScene.js      게임 화면 (웨이브, 뽑기, 공격, 합성, 강화, 승패 판정)
 ```
+
+## 사용한 것
+
+- [Phaser](https://phaser.io) — 2D 게임 엔진 (MIT 라이선스)
+- [갈무리(Galmuri)](https://galmuri.quiple.dev) — 한글 도트 글꼴, © Minseo Lee (SIL Open Font License 1.1)
+- 도트 그림은 `src/art/sprites.js`에 글자 격자로 직접 그렸습니다.

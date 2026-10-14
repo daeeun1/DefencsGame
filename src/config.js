@@ -34,4 +34,6 @@ export const COLORS = {
   danger: '#ff6b6b',
 };
 
-export const FONT = '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+// 갈무리(Galmuri): 무료 한글 도트 글꼴 (SIL Open Font License 1.1, https://galmuri.quiple.dev)
+// 글꼴에 없는 글자(이모지 등)는 기기 기본 글꼴로 나온다
+export const FONT = '"Galmuri11", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
