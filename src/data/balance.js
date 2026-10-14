@@ -6,7 +6,7 @@ export const RAIL_LIMIT = 60; // 레일 위 주문이 이만큼 쌓이면 패배
 export const START_GOLD = 120; // 처음에 8번쯤 뽑을 수 있는 골드
 
 export const BASE_SPEED = 130; // 주문의 기본 이동 속도 (화면 픽셀/초)
-export const HP_GROWTH = 1.15; // 웨이브마다 주문 체력이 몇 배씩 커지는지
+export const HP_GROWTH = 1.17; // 웨이브마다 주문 체력이 몇 배씩 커지는지
 
 // 웨이브마다 나오는 주문 수
 export function ordersInWave(wave) {

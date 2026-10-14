@@ -30,7 +30,7 @@ export const ORDER_TYPES = {
   critic: {
     name: '깐깐한 음식 평론가',
     emoji: '🧐',
-    hp: 1100, // 보스 체력은 웨이브에 따라 커지지 않는 고정값
+    hp: 1600, // 보스 체력은 웨이브에 따라 커지지 않는 고정값
     speed: 0.6,
     weakness: 'cut',
     reward: 60,
@@ -41,7 +41,7 @@ export const ORDER_TYPES = {
   chaebol: {
     name: '재벌 3세',
     emoji: '🤵',
-    hp: 2000,
+    hp: 3000,
     speed: 0.6,
     weakness: 'grill',
     reward: 120,
@@ -54,7 +54,7 @@ export const ORDER_TYPES = {
   king: {
     name: '미식 대왕',
     emoji: '👑',
-    hp: 4500,
+    hp: 6800,
     speed: 0.55,
     weakness: 'cut',
     reward: 0,
