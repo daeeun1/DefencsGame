@@ -55,5 +55,7 @@ export const COLORS = {
 // 글꼴에 없는 글자(이모지 등)는 기기 기본 글꼴로 나온다
 export const FONT = '"Galmuri11", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 
-// 유닛(요리) 그림으로 쓰는 이모지 글꼴: 기기마다 있는 컬러 이모지 글꼴을 차례로 찾는다
-export const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+// 유닛(요리) 그림으로 쓰는 이모지 글꼴.
+// 안드로이드(갤럭시 등)는 기기 기본 이모지를 쓰도록 이름을 따로 적지 않는다.
+// ("Noto Color Emoji"를 적으면 갤럭시에서 오래된 이모지 글꼴이 골라져 최신 이모지가 X로 나올 수 있다)
+export const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", sans-serif';

@@ -19,7 +19,7 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.attackSpeed = 1; // 총괄 주방장 버프로 올라가는 공격 속도 배율
     this.freezeTimer = 0; // 디저트 마녀의 레일 정지 타이머
     this.rangeScale = 1; // 사거리 배율 (정전된 레스토랑에서 어두운 칸이면 줄어든다)
-    this.rangeBonus = 0; // 🥖 세트 메뉴로 늘어난 사거리
+    this.rangeBonus = 0; // 🥫 세트 메뉴로 늘어난 사거리
     this.sets = new Set(); // 지금 들어가 있는 세트 메뉴 id
     this.fullCourse = false; // 🍽️ 풀코스에 들어가 있는지
     this.bonus = { damage: 0, attackSpeed: 0, range: 0, weakness: 0, slow: null, gold: 0 }; // 세트 효과 합계

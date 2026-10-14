@@ -12,7 +12,7 @@
 export const SETS = [
   { id: 'burger', lines: ['cut', 'grill'], emoji: '🍔', name: '버거 세트', desc: '공격력 +20%', effect: { damage: 0.2 } },
   { id: 'brunch', lines: ['cut', 'chill'], emoji: '🥞', name: '브런치 세트', desc: '공격 속도 +20%', effect: { attackSpeed: 0.2 } },
-  { id: 'soup', lines: ['cut', 'boil'], emoji: '🥖', name: '수프와 바게트', desc: '사거리 +30', effect: { range: 30 } },
+  { id: 'soup', lines: ['cut', 'boil'], emoji: '🥫', name: '수프와 빵', desc: '사거리 +30', effect: { range: 30 } },
   { id: 'stew', lines: ['grill', 'boil'], emoji: '🥘', name: '고기 전골', desc: '약점 피해 1.5배 → 1.8배', effect: { weakness: 1.8 } },
   {
     id: 'sweetsalty',

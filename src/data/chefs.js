@@ -85,12 +85,12 @@ export const LINES = ['cut', 'grill', 'chill', 'boil']; // 빵, 고기, 디저�
 export const CHEFS = [
   // 🍞 빵 줄: 빠른 단일 공격
   chef('flour', '밀가루', '🌾', 1, 'cut'),
-  chef('dough', '반죽', '🫓', 2, 'cut'),
+  chef('dough', '바게트', '🥖', 2, 'cut'),
   chef('bread_loaf', '식빵 굽기', '🍞', 3, 'cut', { interval: 0.45 }),
   chef('sandwich', '샌드위치', '🥪', 4, 'cut', { interval: 0.4, range: 260 }),
   // 🍖 고기 줄: 범위 공격
   chef('chicken_prep', '닭 손질', '🐔', 1, 'grill'),
-  chef('firewood', '장작 피우기', '🪵', 2, 'grill'),
+  chef('firewood', '꼬치 끼우기', '🍢', 2, 'grill'),
   chef('drumstick', '닭다리 굽기', '🍗', 3, 'grill', { splash: 85 }),
   chef('whole_bbq', '통바비큐', '🍖', 4, 'grill', { splash: 100 }),
   // 🍰 디저트 줄: 감속
@@ -100,7 +100,7 @@ export const CHEFS = [
   chef('cake', '케이크', '🍰', 4, 'chill', { slow: { factor: 0.35, duration: 2.2 }, range: 260 }),
   // 🍲 국물 줄: 지속 피해
   chef('veggie_prep', '재료 손질', '🧅', 1, 'boil'),
-  chef('broth', '육수 내기', '🫕', 2, 'boil'),
+  chef('broth', '사골 육수', '🦴', 2, 'boil'),
   chef('spice', '양념 풀기', '🌶️', 3, 'boil'),
   chef('hotpot', '전골', '🍲', 4, 'boil', { range: 260 }),
   // 🛎️ 특별: 영웅 2개를 합칠 때 가끔 나온다
