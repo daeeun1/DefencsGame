@@ -51,7 +51,7 @@ function startGame() {
   });
 
   // 개발 중에만: 브라우저 콘솔에서 game으로 게임 상태를 들여다볼 수 있게 한다
-  if (import.meta.env.DEV) window.game = game;
+  if (import.meta.env.DEV || import.meta.env.VITE_EXPOSE_GAME) window.game = game; // VITE_EXPOSE_GAME: 밸런스 시뮬레이션용 빌드
   watchResize(game);
 }
 

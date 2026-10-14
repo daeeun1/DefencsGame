@@ -65,6 +65,7 @@ import {
 import { submitScore } from '../cloud.js';
 import { todaysSpecial, DAILY_TIP_BONUS, DAILY_GRADE } from '../data/daily.js';
 import { GRADES, MAX_GRADE, GRADE_TIP_BONUS, gradeRules, mergeRules } from '../data/grades.js';
+import { CARDS, CARD_WAVES, emptyCardFx, addCardFx } from '../data/cards.js';
 
 // 가게 강화 효과 = 레벨 × 한 단계당 효과
 function shopBonus(id) {
@@ -136,6 +137,11 @@ export default class GameScene extends Phaser.Scene {
     this.drag = null; // 끌고 있는 요리사 정보 { chef, startX, startY, moved }
     this.isOver = false;
     this.paused = false;
+    this.choosingCard = false; // 📜 레시피 카드를 고르는 중이면 게임이 멈춘다
+    this.cardFx = emptyCardFx(); // 이번 판에 고른 카드 효과 합계
+    this.pickedCards = []; // 고른 카드 목록
+    // 무작위 값들. 종류별로 따로 둔다 (🏆 오늘의 도전에서는 날짜로 정해진 값이 나오게 바꾼다)
+    this.rng = { summon: Math.random, wave: Math.random, cards: Math.random, merge: Math.random };
     this.time.paused = false;
     this.gameSpeed = this.registry.get('gameSpeed') ?? 1; // 다시 하기를 눌러도 배속 유지
 
@@ -150,6 +156,7 @@ export default class GameScene extends Phaser.Scene {
     this.upgradePanel = new UpgradePanel(this, {
       levels: this.upgradeLevels,
       getGold: () => this.gold,
+      getCost: (tier) => this.upgradeCostOf(tier),
       onUpgrade: (tier) => this.upgrade(tier),
     });
 
@@ -292,7 +299,7 @@ export default class GameScene extends Phaser.Scene {
   update(time, delta) {
     if (this.paused) return;
     const dt = Math.min(delta, 100) / 1000; // 탭 전환 등으로 시간이 크게 튀는 것 방지
-    for (let i = 0; i < this.gameSpeed && !this.isOver; i++) this.tick(dt);
+    for (let i = 0; i < this.gameSpeed && !this.isOver && !this.choosingCard; i++) this.tick(dt);
     this.updateHud();
   }
 
@@ -355,6 +362,16 @@ export default class GameScene extends Phaser.Scene {
   startWave(wave) {
     this.wave = wave;
     this.waveElapsed = 0;
+    // 🏦 적금 카드: 웨이브마다 이자
+    if (wave > 1 && this.cardFx.interest) {
+      const interest = Math.min(30, Math.floor(this.gold * this.cardFx.interest));
+      if (interest > 0) {
+        this.gold += interest;
+        this.log(`🏦 적금 이자 +${interest}`, COLORS.gold);
+      }
+    }
+    // 📜 정해진 웨이브마다 레시피 카드 고르기
+    if (CARD_WAVES.includes(wave)) this.time.delayedCall(0, () => this.offerCards());
     const bossKey = BOSS_WAVES[wave];
 
     // 이번 웨이브에 나올 주문들을 미리 정해 두고, SPAWN_SPREAD초 동안 고르게 나눠서 내보낸다
@@ -365,7 +382,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.lateNight) mix.ramen = (mix.ramen ?? 1) * 3; // 🥚 새벽 3시에는 라면이 3배
     this.spawnQueue = [];
     for (let i = 0; i < count; i++) {
-      this.spawnQueue.push({ at: (SPAWN_SPREAD * i) / count, type: pickWeighted(mix) });
+      this.spawnQueue.push({ at: (SPAWN_SPREAD * i) / count, type: pickWeighted(mix, this.rng.wave) });
     }
     // 🥚 아주 가끔: 황금 주문, 첫 웨이브의 GG 주문
     if (wave > 1 && Math.random() < GOLDEN_ORDER_CHANCE) {
@@ -606,11 +623,13 @@ export default class GameScene extends Phaser.Scene {
 
     this.gold -= cost;
     this.summonCount += 1;
+    if (this.cardFx.freeSummons > 0) this.cardFx.freeSummons -= 1; // 🎲 인력소 쿠폰
 
-    const tier = Number(pickWeighted(this.mod.summonOdds ?? SUMMON_ODDS));
-    let data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
-    if (Math.random() < DISHWASHER_CHANCE) data = chefById('dishwasher'); // 🥚 0.1%
-    const slot = Phaser.Utils.Array.GetRandom(empty);
+    const rnd = this.rng.summon;
+    const tier = Number(pickWeighted(this.summonOdds(), rnd));
+    let data = pick(chefsOfTier(tier), rnd);
+    if (rnd() < DISHWASHER_CHANCE) data = chefById('dishwasher'); // 🥚 0.1%
+    const slot = pick(empty, rnd);
 
     this.addChef(data, slot);
     revealEffect(this, this.effectLayer, slot.x, slot.y, tier, TIERS[tier].color);
@@ -651,7 +670,7 @@ export default class GameScene extends Phaser.Scene {
     if (!target.dead) {
       const bonus = this.weaknessMultiplier(stats, target, chef);
       if (stats.dot) target.applyDot(stats.dot.dps * bonus * this.powerMultiplier(stats, chef), stats.dot.duration);
-      if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration);
+      if (stats.slow) target.applySlow(stats.slow.factor, stats.slow.duration * (1 + (this.cardFx.slowTime ?? 0)));
       if (chef.bonus.slow) target.applySlow(chef.bonus.slow.factor, chef.bonus.slow.duration);
     }
 
@@ -690,18 +709,20 @@ export default class GameScene extends Phaser.Scene {
   powerMultiplier(stats, chef = null) {
     const setBonus = 1 + (chef ? chef.bonus.damage : 0);
     const daily = this.mod.lineDamage?.[stats.method] ?? 1; // 🍽️ 오늘의 특선: 줄별 공격력
-    return this.upgradeMultiplier(stats.tier) * (1 + codexLevel(stats.id) * CODEX_DAMAGE_PER_LEVEL) * setBonus * daily;
+    const card = 1 + (this.cardFx.damage ?? 0) + (this.cardFx.lineDamage[stats.method] ?? 0); // 📜 레시피 카드
+    return this.upgradeMultiplier(stats.tier) * (1 + codexLevel(stats.id) * CODEX_DAMAGE_PER_LEVEL) * setBonus * daily * card;
   }
 
   // 뽑기 비용: 기본 비용에서 가게 강화(단골 인력소)만큼 할인
   currentSummonCost() {
+    if (this.cardFx.freeSummons > 0) return 0; // 🎲 인력소 쿠폰
     const cost = summonCost(this.summonCount) - shopBonus('summonDiscount');
     return Math.max(1, Math.round(cost * (this.mod.summonCost ?? 1))); // 🍽️ 할인 데이
   }
 
   // 약점이면 1.5배 (🥘 고기 전골 세트면 1.8배). 까다로운 주문은 약점이 아닌 줄이면 절반.
   weaknessMultiplier(stats, order, chef = null) {
-    const weak = chef?.bonus.weakness || WEAKNESS_MULTIPLIER;
+    const weak = (chef?.bonus.weakness || WEAKNESS_MULTIPLIER) + (this.cardFx.weakness ?? 0); // 🎯 카드
     if (stats.method === 'all') return weak; // 요리의 신은 항상 약점으로 공격
     if (order.weakness === stats.method) return weak;
     if (order.type.picky) return 0.5;
@@ -713,14 +734,122 @@ export default class GameScene extends Phaser.Scene {
     return 1 + this.upgradeLevels[tier] * UPGRADE_DAMAGE_PER_LEVEL;
   }
 
+  // 강화 비용 (⬆️ 장비 세일 카드면 할인)
+  upgradeCostOf(tier) {
+    return Math.round(upgradeCost(tier, this.upgradeLevels[tier]) * this.cardFx.upgradeSale);
+  }
+
+  // 뽑기 등급 확률 (🍀 행운의 앞치마 카드면 희귀·영웅이 더 잘 나온다)
+  summonOdds() {
+    const odds = { ...(this.mod.summonOdds ?? SUMMON_ODDS) };
+    for (const tier of Object.keys(odds)) if (tier > 1) odds[tier] *= this.cardFx.luck;
+    return odds;
+  }
+
   upgrade(tier) {
-    const cost = upgradeCost(tier, this.upgradeLevels[tier]);
+    const cost = this.upgradeCostOf(tier);
     if (this.isOver || this.gold < cost) return;
     this.gold -= cost;
     this.upgradeLevels[tier] += 1;
     sfx.upgrade();
     if (this.selectedChef) this.selectChef(this.selectedChef); // 정보창의 공격력 숫자 갱신
     this.updateHud();
+  }
+
+  // ───────── 📜 레시피 카드 ─────────
+
+  // 카드 3장을 보여 주고, 하나 고를 때까지 게임을 멈춘다
+  offerCards() {
+    if (this.isOver || this.choosingCard) return;
+    const pool = [...CARDS];
+    const offer = [];
+    while (offer.length < 3) offer.push(pool.splice(Math.floor(this.rng.cards() * pool.length), 1)[0]);
+    this.choosingCard = true;
+    this.drag = null;
+    this.mergeHints.clear();
+    for (const chef of this.chefs) chef.setPosition(chef.slot.x, chef.slot.y);
+    sfx.star(1);
+
+    const centerX = GAME_WIDTH / 2;
+    const centerY = this.screenHeight / 2;
+    const parts = [this.add.rectangle(0, 0, GAME_WIDTH, this.screenHeight, 0x000000, 0.75).setOrigin(0).setInteractive()];
+    const round = CARD_WAVES.indexOf(this.wave) + 1;
+    parts.push(
+      this.add
+        .text(centerX, centerY - 330, `📜 레시피 카드 (${round}/${CARD_WAVES.length})`, {
+          fontFamily: FONT,
+          fontSize: '42px',
+          fontStyle: 'bold',
+          color: COLORS.gold,
+        })
+        .setOrigin(0.5),
+      this.add.text(centerX, centerY - 275, '하나를 골라 이번 판을 강하게!', { fontFamily: FONT, fontSize: '24px', color: COLORS.text }).setOrigin(0.5),
+    );
+    offer.forEach((card, i) => {
+      const y = centerY - 150 + i * 190;
+      const box = this.add.graphics();
+      const draw = (hover) => {
+        box.clear();
+        box.fillStyle(hover ? 0x4a5260 : COLORS.panel, 1);
+        box.fillRoundedRect(centerX - 310, y - 80, 620, 160, 22);
+        box.lineStyle(5, 0xffd54f, 1);
+        box.strokeRoundedRect(centerX - 310, y - 80, 620, 160, 22);
+      };
+      draw(false);
+      const count = this.pickedCards.filter((c) => c.id === card.id).length;
+      parts.push(
+        box,
+        this.add.text(centerX - 235, y, card.emoji, { fontFamily: EMOJI_FONT, fontSize: '72px' }).setOrigin(0.5),
+        this.add.text(centerX - 155, y - 30, card.name + (count ? `  (+${count + 1})` : ''), {
+          fontFamily: FONT,
+          fontSize: '30px',
+          fontStyle: 'bold',
+          color: COLORS.text,
+        }).setOrigin(0, 0.5),
+        this.add
+          .text(centerX - 155, y + 22, card.desc, { fontFamily: FONT, fontSize: '22px', color: '#d8c8b4', wordWrap: { width: 440 } })
+          .setOrigin(0, 0.5),
+      );
+      const hit = this.add.rectangle(centerX, y, 620, 160, 0, 0).setInteractive({ useHandCursor: true });
+      hit.on('pointerdown', () => draw(true));
+      hit.on('pointerout', () => draw(false));
+      hit.on('pointerup', () => {
+        parts.forEach((p) => p.destroy());
+        this.pickCard(card);
+      });
+      parts.push(hit);
+    });
+    for (const p of parts) p.setDepth(25);
+  }
+
+  pickCard(card) {
+    this.choosingCard = false;
+    this.pickedCards.push(card);
+    addCardFx(this.cardFx, card.fx);
+    if (card.fx?.railLimit) this.railLimit += card.fx.railLimit;
+    const extra = card.now ? ` ${card.now(this)}` : '';
+    sfx.upgrade();
+    this.showBanner(`${card.emoji} ${card.name}!${extra}`, COLORS.gold, 40);
+    this.log(`[카드] ${card.emoji} ${card.name}: ${card.desc}`, COLORS.gold);
+    this.quest?.('card');
+    this.updateBuffs();
+    this.updateHud();
+  }
+
+  // 🧑‍🍳 특별 교육 카드: 판 위 일반 유닛 몇 개를 다음 단계로. 바꾼 개수를 돌려준다
+  promoteRandomUnits(count) {
+    const commons = this.chefs.filter((c) => c.stats.tier === 1 && !c.stats.hidden && nextInLine(c.stats));
+    let done = 0;
+    while (done < count && commons.length > 0) {
+      const chef = commons.splice(Math.floor(this.rng.cards() * commons.length), 1)[0];
+      const slot = chef.slot;
+      const next = nextInLine(chef.stats);
+      this.removeChef(chef);
+      this.addChef(next, slot);
+      ring(this, this.effectLayer, slot.x, slot.y, 0xffd54f, 70);
+      done += 1;
+    }
+    return done;
   }
 
   // ───────── 신화 레시피 ─────────
@@ -813,7 +942,7 @@ export default class GameScene extends Phaser.Scene {
     // 유닛마다 효과 합치기
     for (const chef of this.chefs) {
       const bonus = { damage: 0, attackSpeed: 0, range: 0, weakness: 0, slow: null, gold: 0 };
-      const p = this.mod.setPower ?? 1; // 🍽️ 세트 데이면 효과 2배
+      const p = (this.mod.setPower ?? 1) + (this.cardFx.setPower ?? 0); // 🍽️ 세트 데이, 🍱 세트 할인 카드
       for (const set of SETS.filter((s) => chef.sets.has(s.id))) {
         const e = set.effect;
         bonus.damage += (e.damage ?? 0) * p;
@@ -821,11 +950,11 @@ export default class GameScene extends Phaser.Scene {
         bonus.range += (e.range ?? 0) * p;
         if (e.weakness) bonus.weakness = Math.max(bonus.weakness, WEAKNESS_MULTIPLIER + (e.weakness - WEAKNESS_MULTIPLIER) * p);
         if (e.slow) bonus.slow = { factor: Math.max(0.3, 1 - (1 - e.slow.factor) * p), duration: e.slow.duration };
-        bonus.gold += (e.gold ?? 0) * p;
+        bonus.gold += Math.round((e.gold ?? 0) * p); // 골드는 정수로
       }
       if (chef.fullCourse) bonus.damage += FULL_COURSE.effect.damage * p;
       chef.bonus = bonus;
-      chef.attackSpeed += bonus.attackSpeed;
+      chef.attackSpeed += bonus.attackSpeed + (this.cardFx.lineSpeed[chef.stats.method] ?? 0); // 📜 카드
       chef.rangeBonus = bonus.range;
     }
 
@@ -882,7 +1011,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onPointerDown(pointer) {
-    if (this.isOver || this.paused || this.upgradePanel.isOpen || this.recipePanel.isOpen) return;
+    if (this.isOver || this.paused || this.choosingCard || this.upgradePanel.isOpen || this.recipePanel.isOpen) return;
     const slot = this.slotAt(pointer.worldX, pointer.worldY);
     if (slot && slot.chef) {
       const drag = { chef: slot.chef, startX: pointer.worldX, startY: pointer.worldY, moved: false, petted: false };
@@ -978,22 +1107,28 @@ export default class GameScene extends Phaser.Scene {
   merge(dragged, target) {
     const slot = target.slot;
     const tier = target.stats.tier + 1;
-    const surprise = tier === 4 && Math.random() < HEAD_CHEF_CHANCE;
-    const data = surprise ? chefById('head_chef') : nextInLine(target.stats);
+    const rnd = this.rng.merge;
+    const surprise = tier === 4 && rnd() < HEAD_CHEF_CHANCE;
+    let data = surprise ? chefById('head_chef') : nextInLine(target.stats);
+    // 🔀 비법 소스 카드: 가끔 한 단계 더 (전설까지)
+    if (!surprise && data.tier < 4 && rnd() < (this.cardFx.mergeJump ?? 0)) {
+      data = nextInLine(data);
+      this.floatText(slot.x, slot.y - 80, '🔀 한 단계 더!', COLORS.gold, 26);
+    }
     this.removeChef(dragged);
     this.removeChef(target);
 
     this.addChef(data, slot);
     ring(this, this.effectLayer, slot.x, slot.y, 0xfff8ec, 70);
-    revealEffect(this, this.effectLayer, slot.x, slot.y, tier, TIERS[tier].color);
+    revealEffect(this, this.effectLayer, slot.x, slot.y, data.tier, TIERS[data.tier].color);
     vibrate(30);
-    sfx.merge(tier);
+    sfx.merge(data.tier);
 
-    const color = colorToHex(TIERS[tier].color);
+    const color = colorToHex(TIERS[data.tier].color);
     this.floatText(slot.x, slot.y - 50, data.name, color, 24);
-    this.log(`[합성] ${TIERS[tier].name} ${data.emoji} ${data.name} 완성!`, color);
+    this.log(`[합성] ${TIERS[data.tier].name} ${data.emoji} ${data.name} 완성!`, color);
     if (surprise) this.showBanner(`🛎️ 깜짝 등장!\n${data.name}`, color, 44);
-    else if (tier >= 3) this.showBanner(`🔀 ${TIERS[tier].name}! ${data.emoji} ${data.name}`, color, 44);
+    else if (data.tier >= 3) this.showBanner(`🔀 ${TIERS[data.tier].name}! ${data.emoji} ${data.name}`, color, 44);
     this.updateHud();
   }
 
@@ -1680,6 +1815,10 @@ export default class GameScene extends Phaser.Scene {
       .text(centerX, centerY - 310, '⏸ 일시 정지', { fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
 
+    // 이번 판에 고른 레시피 카드
+    this.pauseCards = this.add
+      .text(centerX, centerY - 262, '', { fontFamily: FONT, fontSize: '22px', color: COLORS.gold, align: 'center', wordWrap: { width: 470 } })
+      .setOrigin(0.5);
     const resume = createButton(this, centerX, centerY - 190, 400, 100, '▶ 계속하기', () => this.setPaused(false), {
       color: 0x3f9a4a,
     });
@@ -1714,7 +1853,7 @@ export default class GameScene extends Phaser.Scene {
       sound.setText(soundLabel());
     });
 
-    this.pauseMenu = this.add.container(0, 0, [shade, box, title, resume, recipes, restart, home, sound]).setDepth(30).setVisible(false);
+    this.pauseMenu = this.add.container(0, 0, [shade, box, title, this.pauseCards, resume, recipes, restart, home, sound]).setDepth(30).setVisible(false);
   }
 
   // 일시 정지 켜고 끄기: 게임 시간, 움직임(트윈), 예약된 일이 모두 멈춘다
@@ -1723,6 +1862,8 @@ export default class GameScene extends Phaser.Scene {
     if (value && this.isOver) return;
     this.paused = value;
     this.pauseMenu.setVisible(value);
+    const cards = this.pickedCards.map((c) => c.emoji).join(' ');
+    this.pauseCards.setText(cards ? `내 카드: ${cards}` : '');
     this.time.paused = value;
     if (value) {
       this.tweens.pauseAll();
@@ -1788,15 +1929,20 @@ export default class GameScene extends Phaser.Scene {
 }
 
 // { salad: 3, ramen: 1 } 같은 비율표에서 하나를 무작위로 고른다
-function pickWeighted(weights) {
+function pickWeighted(weights, rnd = Math.random) {
   const entries = Object.entries(weights);
   const total = entries.reduce((sum, [, w]) => sum + w, 0);
-  let r = Math.random() * total;
+  let r = rnd() * total;
   for (const [key, w] of entries) {
     r -= w;
     if (r < 0) return key;
   }
   return entries[entries.length - 1][0];
+}
+
+// 목록에서 하나를 무작위로 고른다 (rnd: 무작위 값을 주는 함수)
+function pick(list, rnd = Math.random) {
+  return list[Math.floor(rnd() * list.length)];
 }
 
 // 0xff8800 같은 숫자 색을 '#ff8800' 글자 색으로 바꾼다

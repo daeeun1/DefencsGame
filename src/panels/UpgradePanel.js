@@ -12,11 +12,13 @@ const UPGRADE_TIERS = [1, 2, 3, 4, 5];
 export default class UpgradePanel {
   // levels: 등급별 현재 강화 레벨 객체 { 1: 0, 2: 0, ... } (GameScene과 같은 객체를 함께 쓴다)
   // getGold: 지금 골드를 알려 주는 함수
+  // getCost(tier): 그 등급의 지금 강화 비용 (카드 할인 포함)
   // onUpgrade(tier): 강화 버튼을 눌렀을 때 부르는 함수
-  constructor(scene, { levels, getGold, onUpgrade }) {
+  constructor(scene, { levels, getGold, getCost, onUpgrade }) {
     this.scene = scene;
     this.levels = levels;
     this.getGold = getGold;
+    this.getCost = getCost ?? ((tier) => upgradeCost(tier, this.levels[tier]));
 
     const screenHeight = scene.scale.height;
     const panelHeight = 140 + UPGRADE_TIERS.length * ROW_HEIGHT + 120;
@@ -88,7 +90,7 @@ export default class UpgradePanel {
     const gold = this.getGold();
     for (const row of this.rows) {
       const lv = this.levels[row.tier];
-      const cost = upgradeCost(row.tier, lv);
+      const cost = this.getCost(row.tier);
       row.level.setText(`Lv.${lv} · 공격력 +${Math.round(lv * UPGRADE_DAMAGE_PER_LEVEL * 100)}%`);
       row.button.setLabel(`${cost}골드`);
       row.button.setEnabled(gold >= cost);
