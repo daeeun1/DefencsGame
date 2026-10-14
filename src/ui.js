@@ -1,4 +1,5 @@
 import { COLORS, FONT } from './config.js';
+import { sfx } from './audio.js';
 
 // 여러 장면에서 함께 쓰는 화면 부품.
 
@@ -27,7 +28,12 @@ export function createButton(scene, x, y, width, height, label, onClick, { enabl
   button.on('pointerout', () => button.setScale(1));
   button.on('pointerup', () => {
     button.setScale(1);
-    if (isEnabled) onClick();
+    if (isEnabled) {
+      sfx.click();
+      onClick();
+    } else {
+      sfx.denied();
+    }
   });
 
   button.setLabel = (newLabel) => {

@@ -31,6 +31,7 @@ src/
   ui.js               버튼 같은 공용 화면 부품
   save.js             영구 성장 기록 저장 (팁, 별, 강화, 도감)
   effects.js          연출 (파티클, 빛 기둥, 화면 흔들림, 진동, 꽃가루)
+  audio.js            효과음과 배경음악 (파일 없이 코드로 합성)
   data/
     balance.js        웨이브 길이, 체력 증가율 같은 밸런스 숫자
     orders.js         주문(적) 종류와 능력치
@@ -62,3 +63,4 @@ src/
 - [Phaser](https://phaser.io) — 2D 게임 엔진 (MIT 라이선스)
 - [갈무리(Galmuri)](https://galmuri.quiple.dev) — 한글 도트 글꼴, © Minseo Lee (SIL Open Font License 1.1)
 - 도트 그림은 `src/art/sprites.js`에 글자 격자로 직접 그렸습니다.
+- 효과음과 배경음악은 `src/audio.js`에서 Web Audio로 직접 합성합니다.

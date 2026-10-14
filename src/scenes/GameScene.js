@@ -31,6 +31,7 @@ import {
 import { METHODS, TIERS, WEAKNESS_MULTIPLIER, RECIPES, chefById, chefsOfTier } from '../data/chefs.js';
 import { ORDER_TYPES } from '../data/orders.js';
 import { createButton } from '../ui.js';
+import { sfx, playMusic, stopMusic, isOn, toggle } from '../audio.js';
 import { ORDER_COLORS, burst, revealEffect, ring, shake, flash, vibrate, confetti } from '../effects.js';
 import Rail from '../objects/Rail.js';
 import Order from '../objects/Order.js';
@@ -130,6 +131,7 @@ export default class GameScene extends Phaser.Scene {
     this.input.on('pointermove', (pointer) => this.onPointerMove(pointer));
     this.input.on('pointerup', (pointer) => this.onPointerUp(pointer));
 
+    playMusic('game');
     this.startWave(1);
   }
 
@@ -213,6 +215,7 @@ export default class GameScene extends Phaser.Scene {
       this.showBanner(`⚠ VIP 손님 등장!\n${ORDER_TYPES[bossKey].emoji} ${ORDER_TYPES[bossKey].name}`, COLORS.danger, 44);
     } else {
       this.waveTimeLeft = WAVE_DURATION;
+      if (wave > 1) sfx.wave();
       if (wave === 1) this.showBanner(`${this.kitchen.emoji} ${this.kitchen.name}\n${this.kitchen.desc}`, COLORS.textDark, 40);
       else this.showBanner(`웨이브 ${wave}`);
     }
@@ -229,6 +232,8 @@ export default class GameScene extends Phaser.Scene {
       this.boss = order;
       shake(this, 0.01, 400);
       vibrate([80, 40, 80]);
+      sfx.bossAppear();
+      playMusic('boss');
       this.bossRushTimer = 0;
       order.on('weaknessChanged', (method) => {
         this.floatText(order.x, order.y - 70, `약점 변경! ${METHODS[method].emoji}`, COLORS.danger, 30);
@@ -263,6 +268,7 @@ export default class GameScene extends Phaser.Scene {
     this.ordersServed += 1;
     this.orders = this.orders.filter((o) => o !== order);
     if (order.reward > 0) this.floatText(order.x, order.y - 30, `+${order.reward}`, COLORS.gold);
+    sfx.serve();
     burst(this, this.effectLayer, order.x, order.y, ORDER_COLORS[order.typeKey] ?? [0xfff8ec], order.isBoss ? 30 : 7, order.isBoss ? 2 : 1);
 
     // 단체 도시락: 그 자리에서 주먹밥 여러 개로 나뉜다
@@ -289,6 +295,8 @@ export default class GameScene extends Phaser.Scene {
     this.showBanner(`🎉 ${boss.type.name} 만족!`, COLORS.gold, 44);
     flash(this, 0xffd54f);
     vibrate([60, 30, 60]);
+    sfx.bossDefeat();
+    playMusic('game');
     if (this.wave >= TOTAL_WAVES) {
       this.endGame('clear');
     } else {
@@ -323,6 +331,7 @@ export default class GameScene extends Phaser.Scene {
     if (gimmick.type === 'rush') {
       this.rushTimeLeft = gimmick.duration;
       this.showBanner('🍣 레일 가속!', COLORS.danger, 48);
+      sfx.rush();
     } else if (gimmick.type === 'fire') {
       this.startFire(gimmick.duration);
     } else if (gimmick.type === 'blackout') {
@@ -344,6 +353,7 @@ export default class GameScene extends Phaser.Scene {
     this.effectLayer.add(icon);
     this.tweens.add({ targets: glow, alpha: 0.2, duration: 350, yoyo: true, repeat: -1 });
     this.fires.push({ slot, timeLeft: duration, icon });
+    sfx.fire();
   }
 
   // 정전된 레스토랑: 판의 위/아래/왼쪽/오른쪽 절반 중 하나가 어두워진다
@@ -360,6 +370,7 @@ export default class GameScene extends Phaser.Scene {
     this.darkOverlay.fillStyle(0x000000, 0.55);
     for (const s of slots) this.darkOverlay.fillRect(s.x - TILE / 2, s.y - TILE / 2, TILE, TILE);
     this.showBanner('💡 정전!', '#c4bfd6', 52);
+    sfx.blackout();
   }
 
   // ───────── 요리사 ─────────
@@ -400,6 +411,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.addChef(data, slot);
     revealEffect(this, this.effectLayer, slot.x, slot.y, tier, TIERS[tier].color);
+    sfx.summon(tier);
 
     this.floatText(slot.x, slot.y - 50, data.name, colorToHex(TIERS[tier].color), 24);
     if (tier >= 2) this.showBanner(`✨ ${TIERS[tier].name}! ${data.name}`, colorToHex(TIERS[tier].color), 44);
@@ -408,6 +420,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 요리사가 공격: 목표를 향해 투사체를 날린다
   attack(chef, target) {
+    sfx.attack(chef.stats.method);
     const projectile = new Projectile(this, chef, target, (pos) => this.resolveHit(chef.stats, target, pos));
     this.projectileLayer.add(projectile);
     this.projectiles.push(projectile);
@@ -445,6 +458,7 @@ export default class GameScene extends Phaser.Scene {
     this.showBanner('⏳ 시간 정지!', '#9fd8ff', 52);
     flash(this, 0x9fd8ff);
     shake(this, 0.004, 200);
+    sfx.freeze();
   }
 
   // 요리사가 이 주문에 주는 피해: 기본 공격력 × 강화 배율 × 약점이면 1.5배
@@ -480,6 +494,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.isOver || this.gold < cost) return;
     this.gold -= cost;
     this.upgradeLevels[tier] += 1;
+    sfx.upgrade();
     if (this.selectedChef) this.selectChef(this.selectedChef); // 정보창의 공격력 숫자 갱신
     this.updateHud();
   }
@@ -517,6 +532,7 @@ export default class GameScene extends Phaser.Scene {
     this.addChef(data, slot);
     flash(this, 0xffd54f);
     revealEffect(this, this.effectLayer, slot.x, slot.y, 5, TIERS[5].color);
+    sfx.mythic();
 
     this.recipePanel.close();
     this.showBanner(`🌈 신화 탄생!\n${data.emoji} ${data.name}`, colorToHex(TIERS[5].color), 44);
@@ -637,6 +653,7 @@ export default class GameScene extends Phaser.Scene {
     ring(this, this.effectLayer, slot.x, slot.y, 0xfff8ec, 70);
     revealEffect(this, this.effectLayer, slot.x, slot.y, tier, TIERS[tier].color);
     vibrate(30);
+    sfx.merge(tier);
 
     const color = colorToHex(TIERS[tier].color);
     this.floatText(slot.x, slot.y - 50, data.name, color, 24);
@@ -702,12 +719,15 @@ export default class GameScene extends Phaser.Scene {
     this.updateHud();
 
     const rewards = this.giveRewards();
+    stopMusic();
     if (cleared) {
       confetti(this, GAME_WIDTH, this.screenHeight);
       vibrate([60, 40, 60, 40, 120]);
+      sfx.win();
     } else {
       shake(this, 0.015, 500);
       vibrate(250);
+      sfx.lose();
     }
 
     const centerX = GAME_WIDTH / 2;
@@ -735,7 +755,14 @@ export default class GameScene extends Phaser.Scene {
       if (i >= rewards.stars) star.setAlpha(0.2);
       else {
         star.setScale(0);
-        this.tweens.add({ targets: star, scale: 1, delay: 300 + i * 250, duration: 300, ease: 'Back.Out' });
+        this.tweens.add({
+          targets: star,
+          scale: 1,
+          delay: 600 + i * 250,
+          duration: 300,
+          ease: 'Back.Out',
+          onStart: () => sfx.star(i),
+        });
       }
     }
     text(
@@ -745,14 +772,16 @@ export default class GameScene extends Phaser.Scene {
       COLORS.text,
     ).setLineSpacing(6);
 
-    let y = centerY + 20;
+    let y = centerY + 10;
     const bonus = this.kitchen.tipBonus > 1 ? ` · ×${this.kitchen.tipBonus}` : '';
     text(y, `🪙 팁 +${rewards.tips}  (주문 ${this.ordersServed}개 · 별 ${rewards.stars}개${bonus})`, 26, COLORS.gold, true);
-    if (rewards.newBest) text((y += 45), '🏆 새 최고 기록!', 28, COLORS.gold, true);
-    for (const message of rewards.unlocked) text((y += 45), `🔓 ${message}`, 26, '#ff8a8a', true);
+    if (rewards.newBest) text((y += 42), '🏆 새 최고 기록!', 26, COLORS.gold, true);
+    for (const message of rewards.unlocked) text((y += 40), `🔓 ${message}`, 22, '#ff8a8a', true);
 
-    createButton(this, centerX, centerY + 230, 360, 100, '다시 하기', () => this.scene.restart({ kitchen: this.kitchen.id })).setDepth(depth);
-    createButton(this, centerX, centerY + 345, 360, 100, '주방 선택', () => this.scene.start('KitchenSelect')).setDepth(depth);
+    // 버튼은 알림 줄 수에 맞춰 그 아래에 놓는다
+    const buttonY = Math.max(centerY + 230, y + 100);
+    createButton(this, centerX, buttonY, 360, 100, '다시 하기', () => this.scene.restart({ kitchen: this.kitchen.id })).setDepth(depth);
+    createButton(this, centerX, buttonY + 115, 360, 100, '주방 선택', () => this.scene.start('KitchenSelect')).setDepth(depth);
   }
 
   // 판 끝 보상: 별과 팁을 계산해서 저장한다
@@ -952,6 +981,18 @@ export default class GameScene extends Phaser.Scene {
       .text(BOARD_X, HUD_HEIGHT + 4, '← 처음으로', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' })
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
+
+    // 소리 한 번에 켜고 끄기 (효과음 + 음악)
+    const soundLabel = () => (isOn('sfx') || isOn('music') ? '🔊' : '🔇');
+    const sound = this.add
+      .text(BOARD_X + 170, HUD_HEIGHT + 2, soundLabel(), { fontFamily: FONT, fontSize: '24px' })
+      .setInteractive({ useHandCursor: true });
+    sound.on('pointerup', () => {
+      const on = !(isOn('sfx') || isOn('music'));
+      if (isOn('sfx') !== on) toggle('sfx');
+      if (isOn('music') !== on) toggle('music');
+      sound.setText(soundLabel());
+    });
 
     // 오른쪽 위: 신화 레시피 창 열기
     this.recipeButton = this.add

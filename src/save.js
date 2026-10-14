@@ -11,6 +11,7 @@ function defaultSave() {
     codex: {}, // 요리사별 도감 레벨 { apprentice_cutter: 2 }
     discovered: [], // 한 번이라도 만난 요리사 id 목록
     runs: 0, // 플레이한 판 수
+    settings: { sfx: true, music: true, vibration: true }, // 효과음, 배경음악, 진동
   };
 }
 

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { createButton } from '../ui.js';
+import { playMusic, sfx } from '../audio.js';
 import { getSave, writeSave, shopLevel } from '../save.js';
 import { SHOP_ITEMS, shopCost } from '../data/progress.js';
 
@@ -13,6 +14,7 @@ export default class ShopScene extends Phaser.Scene {
   }
 
   create() {
+    playMusic('title');
     this.add.rectangle(0, 0, GAME_WIDTH, 120, COLORS.hud).setOrigin(0);
     this.add
       .text(GAME_WIDTH / 2, 60, '🏪 가게 강화', { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: COLORS.text })
@@ -59,6 +61,7 @@ export default class ShopScene extends Phaser.Scene {
     save.tips -= cost;
     save.shop[item.id] = lv + 1;
     writeSave();
+    sfx.coin();
     this.refresh();
   }
 

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { getSave, totalStars } from '../save.js';
+import { playMusic } from '../audio.js';
 import { KITCHENS } from '../data/kitchens.js';
 
 const CARD_HEIGHT = 200;
@@ -13,6 +14,7 @@ export default class KitchenSelectScene extends Phaser.Scene {
   }
 
   create() {
+    playMusic('title');
     const save = getSave();
     const stars = totalStars();
 

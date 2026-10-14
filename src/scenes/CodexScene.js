@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { createButton } from '../ui.js';
+import { playMusic, sfx } from '../audio.js';
 import { getSave, writeSave, codexLevel, isDiscovered } from '../save.js';
 import { CHEFS, METHODS, TIERS } from '../data/chefs.js';
 import { CODEX_DAMAGE_PER_LEVEL, CODEX_MAX_LEVEL, codexCost } from '../data/progress.js';
@@ -17,6 +18,7 @@ export default class CodexScene extends Phaser.Scene {
   }
 
   create() {
+    playMusic('title');
     this.selected = null;
 
     this.add.rectangle(0, 0, GAME_WIDTH, 120, COLORS.hud).setOrigin(0);
@@ -91,6 +93,7 @@ export default class CodexScene extends Phaser.Scene {
     save.tips -= cost;
     save.codex[chef.id] = lv + 1;
     writeSave();
+    sfx.upgrade();
     this.refresh();
   }
 
