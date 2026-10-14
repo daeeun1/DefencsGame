@@ -102,12 +102,24 @@ export const CHEFS = [
   chef('cooking_god', '요리의 신', 5, 'all', { emoji: '🌟', range: 270 }),
   chef('dessert_witch', '시간을 멈추는 디저트 마녀', 5, 'chill', {
     emoji: '🧁',
+    tool: 'witch',
     range: 270,
     slow: { factor: 0.3, duration: 2.5 },
     freeze: { every: 12, duration: 2.5 }, // 12초마다 레일 전체를 2.5초 동안 멈춘다
     ability: '12초마다 레일 전체 2.5초 정지',
   }),
 ];
+
+// 🥚 비밀 요리사: 뽑기에서 아주 낮은 확률로만 나온다. 합성할 수 없다.
+CHEFS.push(
+  chef('dishwasher', '설거지 담당', 1, 'buff', {
+    emoji: '🧽',
+    tool: 'sponge',
+    hidden: true,
+    buff: { attackSpeed: 0.1 },
+    ability: '공격은 못 하지만 옆 요리사 공격 속도 +10%',
+  }),
+);
 
 // 신화 레시피: 판 위에 재료 요리사가 모두 있으면 만들 수 있다. 재료는 사라진다.
 export const RECIPES = [
@@ -119,8 +131,9 @@ export function chefById(id) {
   return CHEFS.find((c) => c.id === id);
 }
 
+// 뽑기와 합성에 나오는 요리사 (비밀 요리사는 빼고)
 export function chefsOfTier(tier) {
-  return CHEFS.filter((c) => c.tier === tier);
+  return CHEFS.filter((c) => c.tier === tier && !c.hidden);
 }
 
 // 요리사 하나의 능력치를 만든다: 조리법 기본값 × 등급 배율, 그리고 개별로 바꾼 값(extra)

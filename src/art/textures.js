@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PALETTE, CHEF_BODY, TOOLS, ORDERS } from './sprites.js';
 import { CHEFS, TIERS } from '../data/chefs.js';
+import { isChristmas } from '../eastereggs.js';
 
 // 글자 격자(sprites.js)를 실제 그림(텍스처)으로 바꾼다. 게임이 시작될 때 한 번만 실행한다.
 //
@@ -13,14 +14,16 @@ import { CHEFS, TIERS } from '../data/chefs.js';
 const HAT_COLORS = { cooking_god: '#ffd54f', dessert_witch: '#ff9ec7' };
 
 export function createTextures(scene) {
+  const santa = isChristmas(); // 🎅 크리스마스에는 모든 요리사가 산타 모자를 쓴다
   for (const chef of CHEFS) {
-    const toolKey = chef.id === 'dessert_witch' ? 'witch' : chef.method;
+    const toolKey = chef.tool ?? chef.method;
     const tierColor = toHex(TIERS[chef.tier].color);
     const colors = {
       ...PALETTE,
       A: tierColor, // 앞치마 = 등급 색
       a: darken(tierColor, 0.75),
-      H: HAT_COLORS[chef.id] ?? PALETTE.w,
+      H: santa ? PALETTE.r : HAT_COLORS[chef.id] ?? PALETTE.w,
+      h: santa ? PALETTE.w : PALETTE.g,
     };
     makeTexture(scene, `chef_${chef.id}`, 16, 16, (ctx) => {
       drawGrid(ctx, CHEF_BODY, colors);

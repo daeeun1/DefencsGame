@@ -22,6 +22,10 @@ export const ORDER_TYPES = {
   // 까다로운 주문: 머리 위에 표시된 조리법만 제대로 통한다 (나머지는 피해 절반). 조리법은 나올 때마다 무작위
   picky: { name: '까다로운 주문', emoji: '🧂', hp: 40, speed: 1.0, weakness: 'random', reward: 4, picky: true },
 
+  // ── 🥚 이스터 에그 주문 ──
+  gg: { name: 'GG', emoji: '🎮', hp: 30, speed: 1.0, weakness: 'cut', reward: 5 },
+  tteokguk: { name: '떡국', emoji: '🥣', hp: 35, speed: 0.9, weakness: 'boil', reward: 3 },
+
   // ── VIP 손님 (보스) ──
   critic: {
     name: '깐깐한 음식 평론가',

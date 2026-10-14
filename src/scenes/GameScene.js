@@ -32,6 +32,17 @@ import { METHODS, TIERS, WEAKNESS_MULTIPLIER, RECIPES, chefById, chefsOfTier } f
 import { ORDER_TYPES } from '../data/orders.js';
 import { createButton } from '../ui.js';
 import { sfx, playMusic, stopMusic, isOn, toggle } from '../audio.js';
+import {
+  EGGS,
+  EGG_TOTAL,
+  findEgg,
+  eggCount,
+  isChristmas,
+  isSeollal,
+  isLateNight,
+  PET_LINES,
+  CRITIC_REVIEWS,
+} from '../eastereggs.js';
 import { ORDER_COLORS, burst, revealEffect, ring, shake, flash, vibrate, confetti } from '../effects.js';
 import Rail from '../objects/Rail.js';
 import Order from '../objects/Order.js';
@@ -57,6 +68,12 @@ function shopBonus(id) {
 
 // 배속 버튼을 누를 때마다 이 순서로 바뀐다
 const SPEEDS = [1, 2, 3];
+
+// 🥚 이스터 에그 확률
+const DISHWASHER_CHANCE = 0.001; // 뽑기에서 설거지 담당이 나올 확률 (0.1%)
+const GOLDEN_ORDER_CHANCE = 0.02; // 웨이브마다 황금 주문이 나올 확률 (2%)
+const GG_CHANCE = 0.01; // 1웨이브에 GG 주문이 나올 확률 (1%)
+const PET_HOLD_MS = 800; // 요리사를 이만큼 꾹 누르면 쓰다듬기
 
 // 손가락이 이만큼 움직여야 "끌기"로 본다 (그보다 적으면 "누르기")
 const DRAG_THRESHOLD = 12;
@@ -131,8 +148,123 @@ export default class GameScene extends Phaser.Scene {
     this.input.on('pointermove', (pointer) => this.onPointerMove(pointer));
     this.input.on('pointerup', (pointer) => this.onPointerUp(pointer));
 
+    // 🥚 이스터 에그 상태
+    this.potTaps = { chef: null, count: 0, since: 0 }; // 끓이기 요리사 연타
+    this.summonStreak = { id: null, count: 0 }; // 같은 요리사 연속 뽑기
+    this.ramenUsed = false; // RAMEN 입력은 한 판에 한 번
+    this.typed = '';
+    this.input.keyboard?.on('keydown', (event) => this.onKey(event));
+    this.seollal = isSeollal();
+    this.lateNight = isLateNight();
+
     playMusic('game');
     this.startWave(1);
+    this.specialDayGreeting();
+  }
+
+  // ───────── 🥚 이스터 에그 ─────────
+
+  // 이스터 에그를 처음 찾으면 화면 위쪽에 알림
+  eggFound(id) {
+    if (!findEgg(id)) return;
+    const toast = this.add
+      .text(GAME_WIDTH / 2, HUD_HEIGHT + 60, `🥚 비밀 발견! ${EGGS[id]} (${eggCount()}/${EGG_TOTAL})`, {
+        fontFamily: FONT,
+        fontSize: '24px',
+        fontStyle: 'bold',
+        color: COLORS.gold,
+        backgroundColor: '#2b1d14',
+        padding: { x: 16, y: 10 },
+      })
+      .setOrigin(0.5)
+      .setDepth(15);
+    sfx.star(2);
+    this.tweens.add({ targets: toast, alpha: 0, delay: 2200, duration: 500, onComplete: () => toast.destroy() });
+  }
+
+  // 특별한 날 인사 (크리스마스, 설날, 새벽 3시)
+  specialDayGreeting() {
+    const greetings = [];
+    if (isChristmas()) greetings.push('🎅 메리 크리스마스! 요리사들이 산타 모자를 썼어요');
+    if (this.seollal) greetings.push('🧧 새해 복 많이 받으세요! 떡국 주문이 들어와요');
+    if (greetings.length > 0) this.eggFound('holiday');
+    if (this.lateNight) {
+      greetings.push('🌙 야식 타임! 라면 주문이 몰려와요');
+      this.eggFound('midnight');
+    }
+    greetings.forEach((message, i) => {
+      this.time.delayedCall(1800 + i * 1800, () => this.showBanner(message, COLORS.gold, 28));
+    });
+  }
+
+  // 키보드로 RAMEN을 입력하면 황금 라면이 나온다 (컴퓨터에서)
+  onKey(event) {
+    if (this.isOver || this.ramenUsed || !event.key || event.key.length !== 1) return;
+    this.typed = (this.typed + event.key.toUpperCase()).slice(-5);
+    if (this.typed === 'RAMEN') {
+      this.ramenUsed = true;
+      this.spawnOrder('ramen', 0, { golden: true });
+      this.showBanner('🍜 황금 라면 주문!', COLORS.gold, 48);
+      this.eggFound('ramen');
+    }
+  }
+
+  // 끓이기 요리사를 3초 안에 10번 누르면 냄비가 넘친다
+  countPotTap(chef) {
+    if (chef.stats.method !== 'boil') return;
+    const now = this.time.now;
+    const taps = this.potTaps;
+    if (taps.chef !== chef || now - taps.since > 3000) {
+      this.potTaps = { chef, count: 1, since: now };
+      return;
+    }
+    taps.count += 1;
+    if (taps.count >= 10) {
+      this.potTaps = { chef: null, count: 0, since: 0 };
+      this.potOverflow(chef);
+    }
+  }
+
+  potOverflow(chef) {
+    this.showBanner('♨️ 냄비가 넘쳤다!', COLORS.text, 52);
+    sfx.fire();
+    for (let i = 0; i < 40; i++) {
+      const puff = this.add
+        .circle(chef.x + Phaser.Math.Between(-60, 60), chef.y, Phaser.Math.Between(30, 70), 0xfff8ec, 0.7)
+        .setDepth(8);
+      this.tweens.add({
+        targets: puff,
+        x: Phaser.Math.Between(0, GAME_WIDTH),
+        y: Phaser.Math.Between(0, this.screenHeight),
+        scale: 2.5,
+        alpha: 0,
+        duration: Phaser.Math.Between(1200, 2200),
+        delay: i * 25,
+        onComplete: () => puff.destroy(),
+      });
+    }
+    this.eggFound('pot');
+  }
+
+  // 요리사를 꾹 누르면: 볼이 빨개지고 한마디 한다
+  petChef(chef) {
+    const lines = PET_LINES[chef.stats.method] ?? PET_LINES.buff;
+    const line = Phaser.Utils.Array.GetRandom(lines);
+    const bubble = this.add
+      .text(chef.x, chef.y - 70, `💕 ${line}`, {
+        fontFamily: FONT,
+        fontSize: '20px',
+        color: COLORS.textDark,
+        backgroundColor: '#fff8ec',
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setDepth(9);
+    bubble.x = Phaser.Math.Clamp(bubble.x, bubble.width / 2 + 10, GAME_WIDTH - bubble.width / 2 - 10);
+    chef.sprite.setTint(0xffb3b3);
+    this.tweens.add({ targets: bubble, y: bubble.y - 20, alpha: 0, delay: 1300, duration: 400, onComplete: () => bubble.destroy() });
+    this.time.delayedCall(900, () => chef.sprite?.clearTint());
+    this.eggFound('pet');
   }
 
   // 매 프레임 실행된다. delta는 지난 프레임부터 흐른 시간(밀리초).
@@ -151,7 +283,8 @@ export default class GameScene extends Phaser.Scene {
 
     // 2) 나올 시간이 된 주문을 레일에 올린다
     while (this.spawnQueue.length > 0 && this.spawnQueue[0].at <= this.waveElapsed) {
-      this.spawnOrder(this.spawnQueue.shift().type);
+      const next = this.spawnQueue.shift();
+      this.spawnOrder(next.type, 0, next.options);
     }
     if (this.boss) this.bossAbility(dt);
 
@@ -164,6 +297,10 @@ export default class GameScene extends Phaser.Scene {
     for (const order of [...this.orders]) {
       const moveScale = (frozen ? (order.isBoss ? 0.5 : 0) : 1) * rush;
       const dotDamage = order.step(dt, moveScale);
+      if (order.golden && order.distance - order.startDistance >= this.rail.length) {
+        this.escapeOrder(order); // 🥚 황금 주문은 한 바퀴 돌면 사라진다
+        continue;
+      }
       if (dotDamage > 0) this.damageOrder(order, dotDamage);
     }
 
@@ -202,11 +339,19 @@ export default class GameScene extends Phaser.Scene {
     // 이번 웨이브에 나올 주문들을 미리 정해 두고, SPAWN_SPREAD초 동안 고르게 나눠서 내보낸다
     let count = ordersInWave(wave);
     if (bossKey) count = Math.round(count * BOSS_WAVE_ORDER_RATIO);
-    const mix = orderMixForWave(wave);
+    const mix = { ...orderMixForWave(wave) };
+    if (this.seollal) mix.tteokguk = 2; // 🥚 설날에는 떡국 주문
+    if (this.lateNight) mix.ramen = (mix.ramen ?? 1) * 3; // 🥚 새벽 3시에는 라면이 3배
     this.spawnQueue = [];
     for (let i = 0; i < count; i++) {
       this.spawnQueue.push({ at: (SPAWN_SPREAD * i) / count, type: pickWeighted(mix) });
     }
+    // 🥚 아주 가끔: 황금 주문, 첫 웨이브의 GG 주문
+    if (wave > 1 && Math.random() < GOLDEN_ORDER_CHANCE) {
+      this.spawnQueue.push({ at: Math.random() * SPAWN_SPREAD, type: 'salad', options: { golden: true } });
+    }
+    if (wave === 1 && Math.random() < GG_CHANCE) this.spawnQueue.push({ at: 0.5, type: 'gg' });
+    this.spawnQueue.sort((a, b) => a.at - b.at);
 
     if (bossKey) {
       // 보스 웨이브: 제한 시간이 인내심으로 바뀌고, 보스가 맨 먼저 나온다
@@ -222,8 +367,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // 주문을 레일에 올린다. startDistance: 레일 위 어디서 시작할지 (도시락이 나뉠 때 사용)
-  spawnOrder(typeKey, startDistance = 0) {
-    const order = new Order(this, this.rail, typeKey, this.wave, startDistance);
+  spawnOrder(typeKey, startDistance = 0, options = {}) {
+    const order = new Order(this, this.rail, typeKey, this.wave, startDistance, options);
+    if (typeKey === 'gg') this.eggFound('gg');
+    if (order.golden && typeKey !== 'ramen') this.showBanner('✨ 황금 주문이다!', COLORS.gold, 44);
     this.orderLayer.add(order);
     this.orders.push(order);
     if (this.boss) this.orderLayer.bringToTop(this.boss); // 보스는 항상 다른 주문 위에 보이게
@@ -258,6 +405,13 @@ export default class GameScene extends Phaser.Scene {
     this.floatText(this.boss.x, this.boss.y - 70, '💸 빨리빨리!', COLORS.gold, 30);
   }
 
+  // 황금 주문을 놓쳤을 때
+  escapeOrder(order) {
+    this.orders = this.orders.filter((o) => o !== order);
+    this.floatText(order.x, order.y - 30, '✨ 놓쳤다...', COLORS.gold, 24);
+    this.tweens.add({ targets: order, alpha: 0, y: order.y - 40, duration: 400, onComplete: () => order.destroy() });
+  }
+
   damageOrder(order, amount) {
     if (order.takeDamage(amount)) this.completeOrder(order);
   }
@@ -278,6 +432,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     if (order === this.boss) this.bossDefeated(order);
+    if (order.golden) {
+      this.showBanner(`✨ 황금 주문 성공! +${order.reward}`, COLORS.gold, 44);
+      if (order.typeKey !== 'ramen') this.eggFound('golden');
+    }
+    if (order.typeKey === 'gg') this.floatText(order.x, order.y - 60, 'gg wp', COLORS.text, 32);
 
     this.tweens.add({
       targets: order,
@@ -406,7 +565,8 @@ export default class GameScene extends Phaser.Scene {
     this.summonCount += 1;
 
     const tier = Number(pickWeighted(SUMMON_ODDS));
-    const data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
+    let data = Phaser.Utils.Array.GetRandom(chefsOfTier(tier));
+    if (Math.random() < DISHWASHER_CHANCE) data = chefById('dishwasher'); // 🥚 0.1%
     const slot = Phaser.Utils.Array.GetRandom(empty);
 
     this.addChef(data, slot);
@@ -415,6 +575,20 @@ export default class GameScene extends Phaser.Scene {
 
     this.floatText(slot.x, slot.y - 50, data.name, colorToHex(TIERS[tier].color), 24);
     if (tier >= 2) this.showBanner(`✨ ${TIERS[tier].name}! ${data.name}`, colorToHex(TIERS[tier].color), 44);
+    if (data.hidden) {
+      this.showBanner('🧽 설거지 담당이 왔어요!', COLORS.gold, 44);
+      this.eggFound('dishwasher');
+    }
+
+    // 🥚 같은 요리사를 5번 연속 뽑으면 "오늘은 ○○의 날!"
+    const streak = this.summonStreak;
+    streak.count = streak.id === data.id ? streak.count + 1 : 1;
+    streak.id = data.id;
+    if (streak.count === 5) {
+      this.showBanner(`🎉 오늘은 ${data.name}의 날!`, COLORS.gold, 40);
+      confetti(this, GAME_WIDTH, this.screenHeight);
+      this.eggFound('streak');
+    }
     this.updateHud();
   }
 
@@ -564,7 +738,15 @@ export default class GameScene extends Phaser.Scene {
     if (this.isOver || this.upgradePanel.isOpen || this.recipePanel.isOpen) return;
     const slot = this.slotAt(pointer.worldX, pointer.worldY);
     if (slot && slot.chef) {
-      this.drag = { chef: slot.chef, startX: pointer.worldX, startY: pointer.worldY, moved: false };
+      const drag = { chef: slot.chef, startX: pointer.worldX, startY: pointer.worldY, moved: false, petted: false };
+      this.drag = drag;
+      // 🥚 움직이지 않고 꾹 누르고 있으면 쓰다듬기
+      this.time.delayedCall(PET_HOLD_MS, () => {
+        if (this.drag === drag && !drag.moved && !this.isOver) {
+          drag.petted = true;
+          this.petChef(drag.chef);
+        }
+      });
     } else if (pointer.worldY < this.screenHeight - CONTROLS_HEIGHT) {
       this.selectChef(null); // 빈 곳을 누르면 선택 해제
     }
@@ -594,7 +776,9 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.isOver) return;
     if (!drag.moved) {
+      if (drag.petted) return; // 쓰다듬은 것은 선택하지 않는다
       this.selectChef(drag.chef); // 그냥 누른 것: 선택
+      this.countPotTap(drag.chef);
       return;
     }
 
@@ -627,7 +811,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 같은 요리사이고, 합성할 수 있는 등급이면 합성 가능
   canMerge(a, b) {
-    return a !== b && a.stats.id === b.stats.id && a.stats.tier <= MAX_MERGE_TIER;
+    return a !== b && a.stats.id === b.stats.id && a.stats.tier <= MAX_MERGE_TIER && !a.stats.hidden;
   }
 
   // 끄는 동안 합성할 수 있는 칸을 초록색으로 표시
@@ -747,7 +931,13 @@ export default class GameScene extends Phaser.Scene {
       boss: `${this.boss ? this.boss.type.name : 'VIP 손님'}이(가) 화가 나서 떠났어요`,
     };
     text(centerY - 360, cleared ? '🎉 영업 성공!' : '😵 가게가 망했어요...', 58, COLORS.text, true);
-    text(centerY - 290, details[reason], 26, '#d8c8b4');
+    // 🥚 평론가에게 지면 혹평 리뷰가 나온다
+    if (reason === 'boss' && this.boss?.typeKey === 'critic') {
+      text(centerY - 290, `🧐 "${Phaser.Utils.Array.GetRandom(CRITIC_REVIEWS)}"`, 22, '#ff8a8a').setWordWrapWidth(GAME_WIDTH - 80);
+      this.eggFound('critic');
+    } else {
+      text(centerY - 290, details[reason], 26, '#d8c8b4');
+    }
 
     // 별 3개: 받은 별은 ⭐, 못 받은 별은 흐리게
     for (let i = 0; i < 3; i++) {

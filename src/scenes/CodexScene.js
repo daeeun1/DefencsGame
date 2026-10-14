@@ -5,6 +5,7 @@ import { playMusic, sfx } from '../audio.js';
 import { getSave, writeSave, codexLevel, isDiscovered } from '../save.js';
 import { CHEFS, METHODS, TIERS } from '../data/chefs.js';
 import { CODEX_DAMAGE_PER_LEVEL, CODEX_MAX_LEVEL, codexCost } from '../data/progress.js';
+import { EGG_TOTAL, eggCount, findEgg, MAKER_RECIPE } from '../eastereggs.js';
 
 const COLS = 3;
 const CARD_W = 200;
@@ -75,7 +76,42 @@ export default class CodexScene extends Phaser.Scene {
       fontSize: 26,
     });
 
+    // 🥚 비밀 요리사를 뺀 모든 요리사를 발견하면 "만든 사람의 레시피"가 열린다
+    const complete = CHEFS.filter((c) => !c.hidden).every((c) => isDiscovered(c.id));
+    if (complete) {
+      const secret = this.add
+        .text(GAME_WIDTH - 24, 60, '📜', { fontFamily: FONT, fontSize: '44px' })
+        .setOrigin(1, 0.5)
+        .setInteractive({ useHandCursor: true });
+      this.tweens.add({ targets: secret, angle: 10, duration: 400, yoyo: true, repeat: -1 });
+      secret.on('pointerup', () => this.showMakerRecipe());
+    }
+
     this.refresh();
+  }
+
+  // 🥚 만든 사람의 레시피 (도감을 다 채우면 열리는 비밀 페이지)
+  showMakerRecipe() {
+    findEgg('maker');
+    const height = this.scale.height;
+    const shade = this.add.rectangle(0, 0, GAME_WIDTH, height, 0x000000, 0.8).setOrigin(0).setDepth(20).setInteractive();
+    const paper = this.add
+      .text(GAME_WIDTH / 2, height / 2, MAKER_RECIPE + '\n\n(눌러서 닫기)', {
+        fontFamily: FONT,
+        fontSize: '26px',
+        color: COLORS.textDark,
+        backgroundColor: '#fff8ec',
+        padding: { x: 40, y: 36 },
+        lineSpacing: 10,
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
+    shade.on('pointerup', () => {
+      shade.destroy();
+      paper.destroy();
+      this.refresh();
+    });
   }
 
   select(chef) {
@@ -100,7 +136,7 @@ export default class CodexScene extends Phaser.Scene {
   refresh() {
     const save = getSave();
     const foundCount = CHEFS.filter((c) => isDiscovered(c.id)).length;
-    this.headerInfo.setText(`발견 ${foundCount} / ${CHEFS.length}    🪙 팁 ${save.tips}`);
+    this.headerInfo.setText(`발견 ${foundCount}/${CHEFS.length}   🥚 비밀 ${eggCount()}/${EGG_TOTAL}   🪙 ${save.tips}`);
 
     for (const card of this.cards) {
       const lv = codexLevel(card.chef.id);

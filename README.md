@@ -32,6 +32,7 @@ src/
   save.js             영구 성장 기록 저장 (팁, 별, 강화, 도감)
   effects.js          연출 (파티클, 빛 기둥, 화면 흔들림, 진동, 꽃가루)
   audio.js            효과음과 배경음악 (파일 없이 코드로 합성)
+  eastereggs.js       🥚 이스터 에그 목록, 특별한 날 판별, 대사
   data/
     balance.js        웨이브 길이, 체력 증가율 같은 밸런스 숫자
     orders.js         주문(적) 종류와 능력치

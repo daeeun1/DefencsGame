@@ -7,11 +7,13 @@ const COOKING_METHODS = ['cut', 'grill', 'boil', 'chill'];
 
 const SLOW_TINT = 0x9fd8ff; // 감속 중일 때 파란빛
 const DOT_TINT = 0xffb37a; // 지속 피해 중일 때 주황빛
+const GOLDEN_TINT = 0xffd54f; // 🥚 황금 주문
 
 // 레일 위를 도는 주문 하나 (VIP 손님도 이 클래스를 쓴다).
 // 이모지 그림과 체력 막대로 이루어져 있다.
 export default class Order extends Phaser.GameObjects.Container {
-  constructor(scene, rail, typeKey, wave, startDistance = 0) {
+  // options.golden: 🥚 황금 주문 (빠르고, 한 바퀴만 돌고 사라지며, 잡으면 골드를 많이 준다)
+  constructor(scene, rail, typeKey, wave, startDistance = 0, options = {}) {
     super(scene, 0, 0);
 
     this.rail = rail;
@@ -23,6 +25,14 @@ export default class Order extends Phaser.GameObjects.Container {
     this.reward = this.isBoss ? this.type.reward : orderReward(this.type.reward, wave);
     this.distance = 0; // 레일 출발점에서 얼마나 왔는지 (클수록 앞서 있음)
     this.dead = false;
+
+    this.golden = Boolean(options.golden);
+    if (this.golden) {
+      this.maxHp = Math.round(this.maxHp * 0.6);
+      this.hp = this.maxHp;
+      this.reward = 100;
+      this.startDistance = startDistance; // 여기서 한 바퀴를 돌면 사라진다
+    }
 
     // 약한 조리법. 까다로운 주문은 나올 때마다 무작위로 정해진다.
     this.weakness = this.type.weakness === 'random' ? Phaser.Utils.Array.GetRandom(COOKING_METHODS) : this.type.weakness;
@@ -63,7 +73,7 @@ export default class Order extends Phaser.GameObjects.Container {
   // moveScale: 이동 속도 배율 (디저트 마녀의 레일 정지 중이면 0)
   // 이번 프레임에 지속 피해로 받을 피해량을 돌려준다.
   step(dt, moveScale = 1) {
-    let speed = BASE_SPEED * this.type.speed * moveScale;
+    let speed = BASE_SPEED * this.type.speed * moveScale * (this.golden ? 1.7 : 1);
     if (this.slow) {
       speed *= this.slow.factor;
       this.slow.timeLeft -= dt;
@@ -150,6 +160,7 @@ export default class Order extends Phaser.GameObjects.Container {
   updateTint() {
     if (this.slow) this.icon.setTint(SLOW_TINT);
     else if (this.dot) this.icon.setTint(DOT_TINT);
+    else if (this.golden) this.icon.setTint(GOLDEN_TINT);
     else this.icon.clearTint();
   }
 }
