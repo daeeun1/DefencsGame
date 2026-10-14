@@ -18,6 +18,7 @@ function defaultSave() {
 }
 
 let cache = null;
+const writeListeners = []; // 저장할 때마다 부르는 함수들 (클라우드 저장)
 
 // 저장된 기록을 불러온다 (처음 한 번만 실제로 읽고, 그 뒤로는 기억해 둔 값을 쓴다)
 export function getSave() {
@@ -44,13 +45,30 @@ function migrateLegacyIds(save) {
   save.discovered = [...new Set(save.discovered.map((id) => LEGACY_IDS[id] ?? id))];
 }
 
-// 지금 기록을 저장한다
+// 지금 기록을 저장한다 (휴대폰에 저장하고, 클라우드에도 올리도록 알린다)
 export function writeSave() {
+  getSave().updatedAt = Date.now(); // 클라우드 기록과 어느 쪽이 최신인지 비교할 때 쓴다
+  writeLocal();
+  for (const fn of writeListeners) fn();
+}
+
+function writeLocal() {
   try {
     localStorage.setItem(KEY, JSON.stringify(getSave()));
   } catch {
     // 저장 실패(사생활 보호 모드 등)는 조용히 넘어간다
   }
+}
+
+export function onSaveWritten(fn) {
+  writeListeners.push(fn);
+}
+
+// 클라우드에서 받아 온 기록으로 통째로 바꾼다
+export function replaceSave(data) {
+  cache = { ...defaultSave(), ...data };
+  migrateLegacyIds(cache);
+  writeLocal();
 }
 
 // 모든 주방의 최고 별을 더한 값

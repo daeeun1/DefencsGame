@@ -9,6 +9,7 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "firebase": "^11.10.0",
     "galmuri": "2.40.3",
     "phaser": "4.2.1"
   },

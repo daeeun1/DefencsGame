@@ -8,6 +8,7 @@ import KitchenSelectScene from './scenes/KitchenSelectScene.js';
 import GameScene from './scenes/GameScene.js';
 import ShopScene from './scenes/ShopScene.js';
 import CodexScene from './scenes/CodexScene.js';
+import { startCloud } from './cloud.js';
 
 // 도트 글꼴(갈무리)을 먼저 불러온다. 글꼴이 준비되기 전에 글씨를 그리면 다른 글꼴로 나와 버린다.
 async function loadFonts() {
@@ -43,3 +44,4 @@ function startGame() {
 }
 
 loadFonts().then(startGame);
+startCloud(); // ☁️ 클라우드 저장 연결 (실패해도 게임은 그대로 할 수 있다)

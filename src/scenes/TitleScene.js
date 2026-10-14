@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT, COLORS, FONT, EMOJI_FONT } from '../config.js'
 import { createButton } from '../ui.js';
 import { getSave, totalStars } from '../save.js';
 import { playMusic, isOn, toggle } from '../audio.js';
+import { cloudStatus, linkedAccount, linkGoogle, onCloudChange } from '../cloud.js';
 
 // 첫 화면: 게임 제목, 내 팁과 별, 영업 시작 / 가게 강화 / 요리사 도감 버튼.
 export default class TitleScene extends Phaser.Scene {
@@ -88,6 +89,8 @@ export default class TitleScene extends Phaser.Scene {
       text.setAlpha(isOn(option.key) ? 1 : 0.6);
     });
 
+    this.createCloudBar(centerX, top + 62);
+
     this.add
       .text(centerX, height - 50, 'v0.9 · 개발 중', {
         fontFamily: FONT,
@@ -95,5 +98,50 @@ export default class TitleScene extends Phaser.Scene {
         color: '#b9a48f',
       })
       .setOrigin(0.5);
+  }
+
+  // ☁️ 클라우드 저장 상태와 🔗 구글 계정 연결 버튼
+  createCloudBar(x, y) {
+    const labels = {
+      connecting: '☁️ 연결 중...',
+      saving: '☁️ 저장 중...',
+      synced: '☁️ 클라우드 저장됨',
+      offline: '📴 오프라인 (휴대폰에만 저장)',
+    };
+    const statusText = this.add.text(x, y - 26, '', { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' }).setOrigin(0.5);
+    const linkButton = this.add
+      .text(x, y + 20, '', {
+        fontFamily: FONT,
+        fontSize: '22px',
+        color: COLORS.text,
+        backgroundColor: '#3d2a1e',
+        padding: { x: 16, y: 8 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    let busy = false;
+    const refresh = () => {
+      statusText.setText(labels[cloudStatus()] ?? '');
+      const account = linkedAccount();
+      linkButton.setText(account ? `✅ ${account}` : '🔗 구글 계정 연결 (기기 바꿔도 기록 유지)');
+      linkButton.setVisible(cloudStatus() !== 'offline' && cloudStatus() !== 'connecting');
+    };
+    linkButton.on('pointerup', async () => {
+      if (busy || linkedAccount()) return;
+      busy = true;
+      statusText.setText('🔗 구글 로그인 창을 확인하세요');
+      const message = await linkGoogle();
+      busy = false;
+      refresh();
+      statusText.setText(message);
+    });
+
+    refresh();
+    const off = onCloudChange((event) => {
+      if (event === 'pulled') this.scene.restart(); // 클라우드 기록을 받아 왔으면 팁과 별을 다시 그린다
+      else refresh();
+    });
+    this.events.once('shutdown', off);
   }
 }

@@ -66,3 +66,9 @@ src/
 - 도트 그림(주문, 손님)은 `src/art/sprites.js`에 글자 격자로 직접 그렸습니다.
 - 유닛 그림은 기기에 들어 있는 컬러 이모지 글꼴로 표시합니다.
 - 효과음과 배경음악은 `src/audio.js`에서 Web Audio로 직접 합성합니다.
+
+## ☁️ 클라우드 저장 (Firebase)
+
+- 저장 기록은 휴대폰(localStorage)과 Firebase Firestore `saves/{계정 id}`에 함께 저장됩니다.
+- 보안 규칙은 `firestore.rules`에 있습니다. Firebase 콘솔 → Firestore Database → 규칙에 붙여 넣고 게시하세요.
+- 인터넷이 없거나 Firebase가 준비되지 않았으면 휴대폰 저장만으로 그대로 플레이됩니다.
