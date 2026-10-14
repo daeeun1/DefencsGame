@@ -48,6 +48,7 @@ export async function startCloud() {
     ]);
     const app = initializeApp(firebaseConfig);
     fb = { ...authLib, ...storeLib, auth: authLib.getAuth(app), db: storeLib.getFirestore(app) };
+    if (import.meta.env.DEV) window.cloud = fb; // 개발 중에만: 콘솔에서 확인용
 
     // 이 기기에서 전에 로그인한 계정이 있으면 그대로, 없으면 익명 계정을 새로 만든다
     await fb.auth.authStateReady();
