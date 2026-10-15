@@ -135,13 +135,13 @@ export const sfx = {
     arpeggio([72, 76, 79, 84], 0.15, { volume: 0.18, type: 'triangle' });
   },
 
-  // 주문 처리: 동전 소리 (자주 나니까 간격 제한)
+  // 손님 배부름: 동전 소리 (자주 나니까 간격 제한)
   serve: () => {
     if (!throttle('serve', 0.06)) return;
     tone(1318, 0.05, { volume: 0.12 });
     tone(1760, 0.12, { volume: 0.12, delay: 0.05 });
   },
-  // 요리사 공격: 조리법마다 다른 짧은 소리 (아주 작게, 간격 제한)
+  // 요리 던지기: 레시피 줄마다 다른 짧은 소리 (아주 작게, 간격 제한)
   attack: (method) => {
     if (!throttle('attack', 0.09)) return;
     if (method === 'cut') tone(1200, 0.03, { volume: 0.05, slideTo: 600 });
@@ -162,6 +162,11 @@ export const sfx = {
   fire: () => noise(0.4, { volume: 0.18, highpass: 400 }),
   blackout: () => tone(400, 0.5, { type: 'sawtooth', volume: 0.15, slideTo: 50 }),
   upgrade: () => arpeggio([76, 79, 84], 0.05, { volume: 0.18 }),
+  // 🔪 톡 눌러 칼질: 도마 위 "탁!"
+  chop: () => {
+    noise(0.04, { volume: 0.12, highpass: 1800 });
+    tone(520, 0.04, { type: 'square', volume: 0.05, slideTo: 260 });
+  },
   coin: () => arpeggio([88, 93], 0.06, { volume: 0.15 }),
   wave: () => tone(660, 0.08, { volume: 0.12, slideTo: 990 }),
   star: (i) => tone(midiToFreq(84 + i * 4), 0.25, { type: 'triangle', volume: 0.2 }),

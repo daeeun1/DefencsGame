@@ -13,14 +13,14 @@ export const QUEST_BONUS = 100; // 3개를 다 하면 추가 팁
 
 export const QUESTS = [
   { id: 'summon', emoji: '🎲', text: '뽑기 40번 하기', event: 'summon', target: 40 },
-  { id: 'merge', emoji: '🔄', text: '합성 20번 하기', event: 'merge', target: 20 },
-  { id: 'set', emoji: '🍱', text: '세트 메뉴 8번 완성하기', event: 'set', target: 8 },
-  { id: 'legend', emoji: '🌟', text: '전설 유닛 만들기', event: 'legend', target: 1 },
-  { id: 'serve', emoji: '🍽️', text: '주문 300개 처리하기', event: 'serve', target: 300 },
-  { id: 'boss', emoji: '🧐', text: 'VIP 손님 2명 만족시키기', event: 'boss', target: 2 },
+  { id: 'merge', emoji: '🔄', text: '요리 20번 합치기', event: 'merge', target: 20 },
+  { id: 'set', emoji: '🍱', text: '합작 요리 15번 던지기', event: 'set', target: 15 },
+  { id: 'legend', emoji: '🌟', text: '전설 요리 만들기', event: 'legend', target: 1 },
+  { id: 'serve', emoji: '😋', text: '손님 300명 배부르게 하기', event: 'serve', target: 300 },
+  { id: 'boss', emoji: '🦉', text: '보스 손님 2명 배부르게 하기', event: 'boss', target: 2 },
   { id: 'card', emoji: '📜', text: '레시피 카드 5장 고르기', event: 'card', target: 5 },
   { id: 'daily', emoji: '🏆', text: '오늘의 도전 1번 하기', event: 'daily', target: 1 },
-  { id: 'wave', emoji: '🌊', text: '한 판에 20웨이브까지 버티기', event: 'wave', target: 20, max: true },
+  { id: 'chop', emoji: '🔪', text: '톡 눌러 칼질 100번 돕기', event: 'chop', target: 100 },
 ];
 
 // 날짜 글자로 만드는 간단한 해시
@@ -37,7 +37,8 @@ function hash(text) {
 function record() {
   const save = getSave();
   const today = todayKey();
-  if (save.quests?.date !== today) {
+  const known = (id) => QUESTS.some((q) => q.id === id);
+  if (save.quests?.date !== today || !save.quests.ids.every(known)) {
     const pool = [...QUESTS];
     let h = hash(`quest-${today}`);
     const ids = [];

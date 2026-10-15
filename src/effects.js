@@ -4,23 +4,6 @@ import { getSave } from './save.js';
 // 화면 연출 모음: 파티클, 빛 기둥, 반짝이는 고리, 화면 흔들림, 진동.
 // 모두 "보여 주기만" 하고 게임 규칙에는 영향을 주지 않는다.
 
-// 주문을 처리했을 때 튀는 조각 색
-export const ORDER_COLORS = {
-  salad: [0x6dc04a, 0x3f8a35, 0xe8564a],
-  steak: [0xb5503a, 0xa8322a, 0xfff8ec],
-  ramen: [0xffd54f, 0xe8564a, 0xfff8ec],
-  bingsu: [0xff9ec7, 0xa8e0ff, 0xfff8ec],
-  bento: [0xe8564a, 0xffd54f, 0x6dc04a],
-  onigiri: [0xfff8ec, 0x24402e],
-  rush: [0xffd54f, 0xe8564a],
-  picky: [0xc9c9d6, 0xfff8ec],
-  gg: [0xffd54f, 0x2b1d14],
-  tteokguk: [0xfff8ec, 0x9a6237, 0x6dc04a],
-  critic: [0x8e4fc0, 0xffd54f, 0xfff8ec],
-  chaebol: [0x2f3d6b, 0xffd54f, 0xe8564a],
-  king: [0xffd54f, 0xa8322a, 0xfff8ec],
-};
-
 const RAINBOW = [0xe8564a, 0xff9a3c, 0xffd54f, 0x6dc04a, 0x5fa8e0, 0x8e4fc0];
 
 // 작은 네모 조각들이 사방으로 튀었다가 떨어지며 사라진다

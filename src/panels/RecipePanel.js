@@ -2,20 +2,22 @@ import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { METHODS, RECIPES, chefById } from '../data/chefs.js';
 import { RECIPE_UNLOCK_STARS } from '../data/progress.js';
 import { createButton } from '../ui.js';
-import { SETS, FULL_COURSE } from '../data/sets.js';
+import { SETS, LUNCHBOX } from '../data/sets.js';
 
 const PANEL_WIDTH = 660;
 const ROW_HEIGHT = 300;
 const SET_LINE_HEIGHT = 34;
-const SET_SECTION_HEIGHT = 60 + (SETS.length + 1) * SET_LINE_HEIGHT; // 세트 메뉴 안내
+const SET_ROWS = 7; // 덱 4줄로 나올 수 있는 합작 요리 6개 + 도시락
+const SET_SECTION_HEIGHT = 60 + SET_ROWS * SET_LINE_HEIGHT; // 합작 요리 안내
 
-// 신화 레시피 창.
+// 📜 레시피 창: 풀코스(신화) 레시피와 합작 요리 안내.
 // 레시피마다 결과 요리사, 능력, 재료(갖췄으면 ✅, 없으면 ❌)와 "만들기" 버튼을 보여 준다.
 export default class RecipePanel {
   // hasChef(id): 판 위에 그 요리사가 있는지 알려 주는 함수
   // isUnlocked(recipe): 별을 모아서 레시피가 열렸는지 알려 주는 함수
   // onCraft(recipe): 만들기 버튼을 눌렀을 때 부르는 함수
-  constructor(scene, { hasChef, isUnlocked, onCraft }) {
+  // deck: 이번 판 덱 (합작 요리 안내를 덱에 맞춰 보여 준다)
+  constructor(scene, { deck, hasChef, isUnlocked, onCraft }) {
     this.scene = scene;
     this.hasChef = hasChef;
     this.isUnlocked = isUnlocked;
@@ -37,7 +39,7 @@ export default class RecipePanel {
     const blocker = scene.add.rectangle(left, top, PANEL_WIDTH, panelHeight, 0, 0).setOrigin(0).setInteractive();
 
     const title = scene.add
-      .text(GAME_WIDTH / 2, top + 60, '📜 신화 레시피', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: COLORS.text })
+      .text(GAME_WIDTH / 2, top + 60, '📜 풀코스 레시피', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
 
     const parts = [shade, box, blocker, title];
@@ -75,20 +77,21 @@ export default class RecipePanel {
       return { recipe, ingredientTexts, button };
     });
 
-    // 🍽️ 세트 메뉴 안내: 다른 줄 유닛을 상하좌우로 붙이면 받는 효과
+    // 🍱 합작 요리 안내: 다른 줄 요리를 상하좌우로 붙이면 같이 던지는 요리 (이번 덱에서 나오는 것만)
     const setTop = top + 130 + RECIPES.length * ROW_HEIGHT;
     parts.push(
-      scene.add.text(left + 36, setTop, '🍽️ 세트 메뉴 (다른 줄을 옆에 붙이기)', {
+      scene.add.text(left + 36, setTop, '🍱 합작 요리 (다른 줄을 옆에 붙이기)', {
         fontFamily: FONT,
         fontSize: '28px',
         fontStyle: 'bold',
         color: COLORS.gold,
       }),
     );
-    [...SETS, { ...FULL_COURSE, lines: null }].forEach((set, i) => {
-      const combo = set.lines ? set.lines.map((m) => METHODS[m].emoji).join('+') : '2×2';
+    const combos = SETS.filter((set) => set.lines.every((line) => deck.includes(line))).slice(0, SET_ROWS - 1);
+    [...combos, LUNCHBOX].forEach((set, i) => {
+      const combo = set.lines ? set.lines.map((m) => METHODS[m].emoji).join('+') : '그 밖의 짝';
       parts.push(
-        scene.add.text(left + 36, setTop + 50 + i * SET_LINE_HEIGHT, `${set.emoji} ${set.name} (${combo})  ${set.lines ? set.desc : '공격력 +30%'}`, {
+        scene.add.text(left + 36, setTop + 50 + i * SET_LINE_HEIGHT, `${set.emoji} ${set.name} (${combo})  ${set.desc}`, {
           fontFamily: FONT,
           fontSize: '20px',
           color: COLORS.text,
