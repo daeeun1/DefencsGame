@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TIERS } from '../data/chefs.js';
-import { EMOJI_FONT } from '../config.js';
+import { EMOJI_FONT, FONT } from '../config.js';
 import { isChristmas } from '../eastereggs.js';
 
 const PAD_Y = 26; // 소환진(타원 받침)이 유닛 가운데보다 아래에 있는 거리
@@ -72,6 +72,18 @@ export default class Chef extends Phaser.GameObjects.Container {
     // 등장 효과: 작게 시작해서 통통 커진다
     this.body_.setScale(0.2);
     scene.tweens.add({ targets: this.body_, scale: 1, duration: 250, ease: 'Back.Out' });
+  }
+
+  // ⬆️ 줄 강화 레벨 표시 (요리 왼쪽 위 파란 "+3")
+  setUpgrade(level) {
+    if (!this.upgradeText) {
+      if (level <= 0) return;
+      this.upgradeText = this.scene.add
+        .text(-34, -36, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#fff8ec', backgroundColor: '#3f7fd0', padding: { x: 4, y: 1 } })
+        .setOrigin(0.5);
+      this.body_.add(this.upgradeText);
+    }
+    this.upgradeText.setText(`+${level}`).setVisible(level > 0);
   }
 
   get stats() {

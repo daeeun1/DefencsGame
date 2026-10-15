@@ -76,3 +76,22 @@ export const MAX_MERGE_TIER = 3;
 // 요리를 톡 누르면 칼질을 한 번 대신 해 준다. 손 힘을 하나 쓴다.
 export const HAND_POWER_MAX = 10;
 export const HAND_POWER_REGEN = 1.5; // 1초마다 다시 차는 손 힘
+
+// ───────── ⬆️ 줄별 강화 (판 안에서, 골드) ─────────
+
+// 빵 강화, 고기 강화 …: 강화할 때마다 그 줄 요리 양 +15%
+export const LINE_UPGRADE_MAX = 10;
+export const LINE_UPGRADE_BONUS = 0.15;
+const LINE_UPGRADE_COSTS = [30, 50, 80, 120, 170, 230, 300, 380, 470, 570];
+
+export function lineUpgradeCost(level) {
+  return LINE_UPGRADE_COSTS[Math.min(level, LINE_UPGRADE_COSTS.length - 1)];
+}
+
+// ───────── 🔀 바꾸기 ─────────
+
+// 요리를 같은 등급의 다른 줄 요리로 바꾼다 (영웅까지). 10골드부터 바꿀 때마다 5씩 오른다
+export const SWAP_MAX_TIER = 3;
+export function swapCost(swapCount) {
+  return 10 + swapCount * 5;
+}

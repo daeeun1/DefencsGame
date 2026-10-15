@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, TILE, BOARD_COLS, BOARD_ROWS, BOARD_X, gameLayout, COLORS, FONT, EMOJI_FONT } from '../config.js';
-import { WAVE_DURATION, START_GOLD, SPAWN_SPREAD, SUMMON_ODDS, MAX_MERGE_TIER, BOSS_PATIENCE, BOSS_WAVE_ORDER_RATIO, HAND_POWER_MAX, HAND_POWER_REGEN, summonCost, sellPrice } from '../data/balance.js';
+import { WAVE_DURATION, START_GOLD, SPAWN_SPREAD, SUMMON_ODDS, MAX_MERGE_TIER, BOSS_PATIENCE, BOSS_WAVE_ORDER_RATIO, HAND_POWER_MAX, HAND_POWER_REGEN, LINE_UPGRADE_MAX, LINE_UPGRADE_BONUS, SWAP_MAX_TIER, summonCost, sellPrice, lineUpgradeCost, swapCost } from '../data/balance.js';
 import { METHODS, TIERS, RECIPES, HEAD_CHEF_CHANCE, LINES, STARTER_LINES, chefById, chefsOfTier, nextInLine } from '../data/chefs.js';
 import { MONSTERS, LIKE_MULTIPLIER, PICKY_MULTIPLIER, MONSTER_COLORS } from '../data/monsters.js';
 import { setFor, COMBO_CHARGE, COMBO_POWER } from '../data/sets.js';
@@ -23,6 +23,7 @@ import Monster from '../objects/Monster.js';
 import Chef from '../objects/Chef.js';
 import Projectile from '../objects/Projectile.js';
 import RecipePanel from '../panels/RecipePanel.js';
+import UpgradePanel from '../panels/UpgradePanel.js';
 import { getSave, writeSave, shopLevel, lineLevel, discover } from '../save.js';
 import { SHOP_ITEMS, TIPS_PER_ORDER, TIPS_PER_STAR, LINE_DAMAGE_PER_LEVEL, runScore, runLineXp, lineLevelOf } from '../data/progress.js';
 import { submitScore } from '../cloud.js';
@@ -107,6 +108,8 @@ export default class GameScene extends Phaser.Scene {
     this.summonCount = 0; // 지금까지 뽑은 횟수 (뽑기 비용 계산용)
     this.deck = this.run.deck ?? STARTER_LINES; // 이번 판에 나오는 레시피 4줄
     this.hand = HAND_POWER_MAX + this.gear.hand; // 🔪 손 힘: 요리를 톡 눌러 칼질을 도울 때 하나씩 쓴다
+    this.lineUpgrades = Object.fromEntries(this.deck.map((l) => [l, 0])); // ⬆️ 줄별 강화 레벨 (이번 판)
+    this.swapCount = 0; // 🔀 바꾸기 한 횟수 (값이 오른다)
     this.comboCharge = new Map(); // 붙어 있는 두 요리의 합작 게이지 { '칸-칸': 찬 양 }
     this.links = []; // 지금 붙어 있는 합작 요리 연결
     // 이번 판에 쓸 수 있는 기능 (동네 지도에서 하나씩 열린다)
@@ -138,6 +141,14 @@ export default class GameScene extends Phaser.Scene {
     this.createLayers();
     this.createHud();
     this.createControls();
+
+    this.upgradePanel = new UpgradePanel(this, {
+      deck: this.deck,
+      levels: this.lineUpgrades,
+      getGold: () => this.gold,
+      getCost: (line) => lineUpgradeCost(this.lineUpgrades[line]),
+      onUpgrade: (line) => this.upgradeLine(line),
+    });
 
     this.recipePanel = new RecipePanel(this, {
       deck: this.deck,
@@ -848,7 +859,57 @@ export default class GameScene extends Phaser.Scene {
     const daily = this.mod.lineDamage?.[stats.method] ?? 1; // 🍽️ 오늘의 도전: 줄별 요리 양
     const card = 1 + (this.cardFx.damage ?? 0) + (this.cardFx.lineDamage[stats.method] ?? 0); // 📜 레시피 카드
     const gear = 1 + this.gear.damage + (this.gear.lineDamage[stats.method] ?? 0); // 🍳 냄비
-    return (1 + this.levelOf(stats.method) * LINE_DAMAGE_PER_LEVEL) * daily * card * gear;
+    const upgrade = 1 + (this.lineUpgrades[stats.method] ?? this.avgUpgrade()) * LINE_UPGRADE_BONUS; // ⬆️ 줄 강화
+    return (1 + this.levelOf(stats.method) * LINE_DAMAGE_PER_LEVEL) * daily * card * gear * upgrade;
+  }
+
+  // 요리의 신 같은 특별 요리는 덱 줄 강화의 평균
+  avgUpgrade() {
+    const levels = Object.values(this.lineUpgrades);
+    return levels.reduce((sum, n) => sum + n, 0) / levels.length;
+  }
+
+  // ⬆️ 줄 강화: 골드를 내고 그 줄 요리 양을 올린다
+  upgradeLine(line) {
+    const level = this.lineUpgrades[line];
+    const cost = lineUpgradeCost(level);
+    if (this.isOver || level >= LINE_UPGRADE_MAX || this.gold < cost) return;
+    this.gold -= cost;
+    this.lineUpgrades[line] = level + 1;
+    sfx.upgrade();
+    for (const chef of this.chefs) {
+      if (chef.stats.method !== line) continue;
+      chef.setUpgrade(level + 1);
+      ring(this, this.effectLayer, chef.x, chef.y, 0x3f7fd0, 50);
+    }
+    this.log(`[강화] ${METHODS[line].emoji} ${METHODS[line].name} 강화 Lv.${level + 1}! 요리 양 +${Math.round((level + 1) * LINE_UPGRADE_BONUS * 100)}%`, '#9fd0ff');
+    if (this.selectedChef) this.updateCard();
+    this.updateHud();
+  }
+
+  // 🔀 바꾸기: 고른 요리를 같은 등급, 다른 줄의 요리로 무작위로 바꾼다 (영웅까지)
+  canSwap(chef) {
+    const s = chef.stats;
+    return s.tier <= SWAP_MAX_TIER && this.deck.includes(s.method) && !s.hidden && !s.special;
+  }
+
+  swapSelected() {
+    const chef = this.selectedChef;
+    const cost = swapCost(this.swapCount);
+    if (this.isOver || !chef || !this.canSwap(chef) || this.gold < cost) return;
+    const options = chefsOfTier(chef.stats.tier, this.deck).filter((c) => c.method !== chef.stats.method);
+    if (options.length === 0) return;
+    const data = pick(options, this.rng.merge);
+    this.gold -= cost;
+    this.swapCount += 1;
+    const slot = chef.slot;
+    this.removeChef(chef);
+    const fresh = this.addChef(data, slot);
+    this.selectChef(fresh);
+    ring(this, this.effectLayer, slot.x, slot.y, 0xc77dff, 60);
+    sfx.merge(1);
+    this.floatText(slot.x, slot.y - 50, `🔀 ${data.name}`, '#d9a8ff', 24);
+    this.updateHud();
   }
 
   // 레시피 줄 레벨 (판을 시작할 때 정해진다). 요리의 신 같은 특별 요리는 덱 줄 레벨의 평균
@@ -1133,7 +1194,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onPointerDown(pointer) {
-    if (this.isOver || this.paused || this.choosingCard || this.recipePanel.isOpen) return;
+    if (this.isOver || this.paused || this.choosingCard || this.recipePanel.isOpen || this.upgradePanel.isOpen) return;
     const slot = this.slotAt(pointer.worldX, pointer.worldY);
     if (slot && slot.chef) {
       const drag = { chef: slot.chef, startX: pointer.worldX, startY: pointer.worldY, moved: false, petted: false };
@@ -1332,6 +1393,7 @@ export default class GameScene extends Phaser.Scene {
   addChef(data, slot) {
     if (discover(data.id)) this.floatText(slot.x, slot.y + 45, '📖 도감 등록!', COLORS.gold, 20);
     const chef = new Chef(this, data, slot);
+    chef.setUpgrade(this.lineUpgrades[data.method] ?? 0);
     slot.chef = chef;
     this.chefLayer.add(chef);
     this.chefs.push(chef);
@@ -1375,7 +1437,7 @@ export default class GameScene extends Phaser.Scene {
     const info = this.info;
     const showing = Boolean(chef);
     this.logText.setVisible(!showing);
-    for (const part of [info.emoji, info.title, info.detail, this.sellButton]) part.setVisible(showing);
+    for (const part of [info.emoji, info.title, info.detail, this.sellButton, this.swapButton]) part.setVisible(showing);
     if (!chef) {
       if (this.lastLog) this.logText.setText(this.lastLog.message).setColor(this.lastLog.color);
       return;
@@ -1407,7 +1469,7 @@ export default class GameScene extends Phaser.Scene {
     if (sets.length > 0) parts.push(`합작 ${sets.join('')}`);
     info.detail.setText(parts.join(' · '));
     // 판매 버튼과 겹치지 않게 너무 길면 줄인다
-    const maxWidth = GAME_WIDTH - 104 - 80 - 96 - 10;
+    const maxWidth = GAME_WIDTH - 104 - 80 - 96 - 10 - 130; // 판매·바꾸기 버튼과 겹치지 않게
     info.detail.setFontSize(18);
     if (info.detail.width > maxWidth) info.detail.setFontSize(Math.floor((18 * maxWidth) / info.detail.width));
     info.title.setFontSize(24);
@@ -1429,6 +1491,7 @@ export default class GameScene extends Phaser.Scene {
       this.tutorial = null;
     }
     this.recipePanel.close();
+    this.upgradePanel.close();
     this.updateHud();
 
     const rewards = this.giveRewards();
@@ -1927,15 +1990,22 @@ export default class GameScene extends Phaser.Scene {
     const pairs = this.countMergePairs();
     this.mergeButton.setSub(pairs > 0 ? `${pairs}쌍` : '');
     this.mergeButton.setLit(pairs > 0);
+    const costs = this.deck.filter((l) => this.lineUpgrades[l] < LINE_UPGRADE_MAX).map((l) => lineUpgradeCost(this.lineUpgrades[l]));
+    const cheapest = costs.length ? Math.min(...costs) : null;
+    this.upgradeButton.setSub(cheapest === null ? 'MAX' : `${cheapest}골드부터`);
     this.summonButton.setEnabled(!this.isOver && !full && this.gold >= cost);
 
     if (this.selectedChef) {
       const chef = this.selectedChef;
       if (!this.canSell(chef)) this.sellButton.setLabel('판매 불가').setEnabled(false);
       else this.sellButton.setLabel(`💰 +${this.sellPriceOf(chef)}`).setEnabled(!this.isOver);
+      const cost = swapCost(this.swapCount);
+      if (!this.canSwap(chef)) this.swapButton.setLabel('🔀 불가').setEnabled(false);
+      else this.swapButton.setLabel(`🔀 ${cost}`).setEnabled(!this.isOver && this.gold >= cost);
     }
 
     if (this.recipePanel.isOpen) this.recipePanel.refresh();
+    if (this.upgradePanel.isOpen) this.upgradePanel.refresh();
 
     // 만들 수 있는 신화 레시피가 있을 때만 판 위에 반짝이는 레시피 버튼이 나온다
     const ready = !this.isOver && this.canCraftAny();
@@ -2063,20 +2133,24 @@ export default class GameScene extends Phaser.Scene {
         .text(96, cy + info.h * 0.22, '', { fontFamily: FONT, fontSize: small ? '16px' : '18px', color: '#b9c2cf' })
         .setOrigin(0, 0.5),
     };
-    this.sellButton = createButton(this, GAME_WIDTH - 104, cy, 160, info.h - 16, '', () => this.sellSelected(), {
-      fontSize: 24,
+    this.sellButton = createButton(this, GAME_WIDTH - 92, cy, 140, info.h - 16, '', () => this.sellSelected(), {
+      fontSize: 22,
       color: 0xc99a2e,
     });
-    this.log('💬 같은 요리끼리 겹치면 합치기, 요리를 톡 누르면 칼질 돕기!', '#b9a48f');
+    this.swapButton = createButton(this, GAME_WIDTH - 92 - 136, cy, 124, info.h - 16, '', () => this.swapSelected(), {
+      fontSize: 22,
+      color: 0x8e4fc0,
+    });
+    this.log('💬 같은 요리끼리 겹치면 합치기, 톡 누르면 칼질 돕기, 🔀로 다른 줄로 바꾸기!', '#b9a48f');
 
-    // 큰 명령 버튼 2개: 뽑기(크게) / 자동 합치기
+    // 큰 명령 버튼 3개: 뽑기(크게) / 자동 합치기 / 강화
     const gap = 12;
     const height = Math.min(150, panel.h);
     const top = panel.y + (panel.h - height) / 2;
     const left = 12;
-    const total = GAME_WIDTH - 24 - gap;
-    const summonWidth = Math.round(total * 0.6);
-    const mergeWidth = total - summonWidth;
+    const total = GAME_WIDTH - 24 - gap * 2;
+    const summonWidth = Math.round(total * 0.42);
+    const mergeWidth = (total - summonWidth) / 2;
     const cyButtons = top + height / 2;
     this.summonButton = createCommandButton(
       this,
@@ -2095,6 +2169,15 @@ export default class GameScene extends Phaser.Scene {
       height,
       { emoji: '🔄', label: '자동 합치기', color: 0xc77d2e },
       () => this.autoMerge(),
+    );
+    this.upgradeButton = createCommandButton(
+      this,
+      left + summonWidth + gap * 2 + mergeWidth * 1.5,
+      cyButtons,
+      mergeWidth,
+      height,
+      { emoji: '⬆️', label: '줄 강화', color: 0x3f7fd0 },
+      () => this.upgradePanel.open(),
     );
     this.updateSpeedButton();
 
