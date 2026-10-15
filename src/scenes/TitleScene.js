@@ -7,7 +7,7 @@ import { todaysSpecial, DAILY_TIP_BONUS, DAILY_TRIES, triesLeft, useTry } from '
 import { cloudStatus, linkedAccount, linkGoogle, onCloudChange } from '../cloud.js';
 import { canFullscreen, isFullscreen, toggleFullscreen } from '../fullscreen.js';
 import { todaysQuests, claimQuest, canClaimBonus, claimBonus, hasQuestReward, QUEST_REWARD, QUEST_BONUS } from '../data/quests.js';
-import { TOWNS, nextStage, hasFeature, FEATURE_TOWN } from '../data/towns.js';
+import { TOWNS, hasFeature, FEATURE_TOWN, bestWave, townOfWave } from '../data/towns.js';
 import { dailyRun, eventRun } from '../data/runs.js';
 import { currentEvent, EVENT_BONUS } from '../data/events.js';
 import { freeBoxReady } from '../data/items.js';
@@ -63,12 +63,13 @@ export default class TitleScene extends Phaser.Scene {
     const title = THEMES.find((t) => t.id === save.wear?.title)?.title;
     if (title) this.add.text(centerX, top + 628, title, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: COLORS.gold }).setOrigin(0.5);
 
-    // 🗺️ 모험: 다음에 할 스테이지가 있는 동네 지도로
-    const next = nextStage();
-    const town = TOWNS[next.town];
-    createButton(this, centerX, top + 730, 560, 140, `🗺️ 모험 ${next.town + 1}-${next.stage}\n${town.emoji} ${town.name}`, () => this.scene.start('Map', { town: next.town }), {
-      fontSize: 40,
-    });
+    // 🗺️ 여정: 이어 할 판이 있으면 이어 하기, 아니면 여정 화면으로
+    const snap = save.journey;
+    const best = bestWave();
+    const label = snap
+      ? `▶ 이어 하기 웨이브 ${snap.wave}\n${TOWNS[townOfWave(snap.wave)].emoji} ${TOWNS[townOfWave(snap.wave)].name}`
+      : `🗺️ 여정 출발\n${best > 0 ? `🏁 최고 웨이브 ${best}` : '배고픈 손님을 막아라!'}`;
+    createButton(this, centerX, top + 730, 560, 140, label, () => this.scene.start('Journey'), { fontSize: 40 });
 
     // 🏆 오늘의 도전, 📋 주문서: 동네 1을 깨면 열린다
     const dailyOpen = hasFeature('daily');

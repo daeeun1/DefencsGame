@@ -3,7 +3,7 @@ import { GAME_WIDTH, COLORS, FONT, EMOJI_FONT } from '../config.js';
 import { createButton } from '../ui.js';
 import { playMusic, sfx } from '../audio.js';
 import { getSave, isDiscovered } from '../save.js';
-import { CHEFS, ALL_LINES, METHODS, TIERS, chefsOfLine } from '../data/chefs.js';
+import { CHEFS, ALL_LINES, METHODS, chefsOfLine, rankOf } from '../data/chefs.js';
 import { lineLevelOf, LINE_DAMAGE_PER_LEVEL, LINE_MAX_LEVEL } from '../data/progress.js';
 import { TOWNS, hasFeature } from '../data/towns.js';
 import { EGG_TOTAL, eggCount, findEgg, MAKER_RECIPE } from '../eastereggs.js';
@@ -44,24 +44,32 @@ export default class CodexScene extends Phaser.Scene {
       return this.drawLineCard(line, x, y);
     });
 
-    // 특별 요리 (총괄 주방장, 풀코스, 비밀)
-    const specialY = top + 4 * (CARD_H + GAP) + 10;
-    this.add.text(left, specialY, '✨ 특별 요리', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: COLORS.gold });
-    const specials = CHEFS.filter((c) => c.special || c.hidden || c.tier === 5);
+    // ✨ 특별·히든 요리 (총괄 주방장, 히든 조합, 비밀)
+    const specialY = top + 4 * (CARD_H + GAP) + 6;
+    const specials = CHEFS.filter((c) => c.special || c.hidden || c.grade);
+    const foundSpecial = specials.filter((c) => isDiscovered(c.id)).length;
+    this.add.text(left, specialY, `✨ 특별·히든 요리 ${foundSpecial}/${specials.length}`, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: COLORS.gold });
+    const perRow = 9;
+    const step = (GAME_WIDTH - 2 * left) / perRow;
     specials.forEach((chef, i) => {
-      const x = left + 40 + i * 100;
-      const y = specialY + 70;
+      const x = left + step / 2 + (i % perRow) * step;
+      const y = specialY + 58 + Math.floor(i / perRow) * 66;
       const seen = isDiscovered(chef.id);
-      this.add.circle(x, y, 36, seen ? TIERS[chef.tier].color : 0x5a4a3e).setStrokeStyle(4, 0x2b1d14);
+      const rank = rankOf(chef);
+      this.add.circle(x, y, 28, seen ? rank.color : 0x5a4a3e).setStrokeStyle(3, 0x2b1d14);
       const icon = this.add
-        .text(x, y, seen ? chef.emoji : '?', { fontFamily: seen ? EMOJI_FONT : FONT, fontSize: '38px', fontStyle: 'bold', color: '#b9a48f' })
+        .text(x, y, seen ? chef.emoji : '?', { fontFamily: seen ? EMOJI_FONT : FONT, fontSize: '30px', fontStyle: 'bold', color: '#b9a48f' })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
-      icon.on('pointerup', () => this.showDetail(seen ? `[${TIERS[chef.tier].name}] ${chef.emoji} ${chef.name}\n${chef.ability ?? METHODS[chef.method].role}` : '❓ 아직 만나지 못한 특별 요리예요'));
+      const recipe = chef.ingredients ? `\n재료: ${chef.ingredients.map((id) => CHEFS.find((c) => c.id === id).emoji).join(' + ')}` : '';
+      icon.on('pointerup', () =>
+        this.showDetail(seen ? `[${rank.name}] ${chef.emoji} ${chef.name}\n${chef.ability ?? METHODS[chef.method].role}${recipe}` : `❓ 아직 만나지 못한 ${rank.name} 요리예요`),
+      );
     });
+    const specialRows = Math.ceil(specials.length / perRow);
 
     // 아래: 고른 것 설명과 덱 버튼
-    this.detail = this.add.text(left, specialY + 130, '줄 카드를 누르면 자세히 보여요.\n판을 끝낼 때 덱에 넣은 줄이 경험치를 받아요.', {
+    this.detail = this.add.text(left, specialY + 40 + specialRows * 66, '줄 카드를 누르면 자세히 보여요.\n판을 끝낼 때 덱에 넣은 줄이 경험치를 받아요.', {
       fontFamily: FONT,
       fontSize: '22px',
       color: COLORS.text,
@@ -69,7 +77,7 @@ export default class CodexScene extends Phaser.Scene {
       wordWrap: { width: GAME_WIDTH - 60 },
     });
     if (hasFeature('deck')) {
-      createButton(this, GAME_WIDTH / 2, Math.max(specialY + 300, this.scale.height - 70), 360, 84, '🃏 덱 고르기', () => this.scene.start('Deck', { from: 'Codex' }), {
+      createButton(this, GAME_WIDTH / 2, Math.max(specialY + 120 + specialRows * 66 + 60, this.scale.height - 60), 360, 76, '🃏 덱 고르기', () => this.scene.start('Deck', { from: 'Codex' }), {
         fontSize: 30,
         color: 0x8e4fc0,
       });

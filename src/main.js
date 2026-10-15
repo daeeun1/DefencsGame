@@ -4,7 +4,7 @@ import fontBoldUrl from 'galmuri/dist/Galmuri11-Bold.woff2?url';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from './config.js';
 import BootScene from './scenes/BootScene.js';
 import TitleScene from './scenes/TitleScene.js';
-import MapScene from './scenes/MapScene.js';
+import JourneyScene from './scenes/JourneyScene.js';
 import DeckScene from './scenes/DeckScene.js';
 import GameScene from './scenes/GameScene.js';
 import ShopScene from './scenes/ShopScene.js';
@@ -12,7 +12,7 @@ import CodexScene from './scenes/CodexScene.js';
 import RankingScene from './scenes/RankingScene.js';
 import { startCloud } from './cloud.js';
 import { getSave, writeSave } from './save.js';
-import { stageRun, dailyRun, endlessRun, eventRun } from './data/runs.js';
+import { journeyRun, dailyRun, eventRun } from './data/runs.js';
 import { currentEvent } from './data/events.js';
 import { autoFullscreen } from './fullscreen.js';
 
@@ -51,7 +51,7 @@ function startGame() {
       width: GAME_WIDTH,
       height: gameHeight(),
     },
-    scene: [BootScene, TitleScene, MapScene, DeckScene, GameScene, ShopScene, CodexScene, RankingScene], // 첫 번째 장면이 가장 먼저 열린다
+    scene: [BootScene, TitleScene, JourneyScene, DeckScene, GameScene, ShopScene, CodexScene, RankingScene], // 첫 번째 장면이 가장 먼저 열린다
   });
 
   // 개발 중에만: 브라우저 콘솔에서 game으로 게임 상태를 들여다볼 수 있게 한다
@@ -59,7 +59,7 @@ function startGame() {
   if (import.meta.env.DEV || import.meta.env.VITE_EXPOSE_GAME) {
     window.game = game;
     window.save = { getSave, writeSave };
-    window.runs = { stageRun, dailyRun, endlessRun, eventRun, currentEvent };
+    window.runs = { journeyRun, dailyRun, eventRun, currentEvent };
   }
   watchResize(game);
 }

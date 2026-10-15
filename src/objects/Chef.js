@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { TIERS } from '../data/chefs.js';
+import { rankOf } from '../data/chefs.js';
 import { EMOJI_FONT, FONT } from '../config.js';
 import { isChristmas } from '../eastereggs.js';
 
@@ -26,7 +26,7 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.rangeScale = 1; // 사거리 배율 (어두운 칸이면 줄어든다)
     this.sets = new Set(); // 지금 붙어 있는 합작 요리 id
 
-    const tierColor = TIERS[data.tier].color;
+    const tierColor = rankOf(data).color;
 
     // 소환진: 납작한 상자(squash) 안에 동그라미를 그려서 바닥에 놓인 타원처럼 보이게 한다
     const glow = scene.add.graphics();

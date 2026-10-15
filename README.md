@@ -38,10 +38,11 @@ src/
   data/
     balance.js        웨이브 길이, 배고픔 증가율, 뽑기 비용, 손 힘 같은 밸런스 숫자
     monsters.js       🐭 몬스터 손님과 보스 손님
-    chefs.js          레시피 줄 8개의 요리 목록, 등급, 칼질 횟수, 풀코스 레시피
+    chefs.js          레시피 줄 8개의 요리 목록, 등급, 칼질 횟수, 🍳 히든 요리 24개
     sets.js           🍱 합작 요리
-    towns.js          🗺️ 동네 6개 × 스테이지 10개, 별 기준, 기능이 열리는 동네
-    runs.js           한 판의 설정 (스테이지, 오늘의 도전, 무한 모드, 이벤트)
+    towns.js          🗺️ 동네 6개, 여정 진행(최고 웨이브, 동네 별), 기능이 열리는 동네
+    runs.js           한 판의 설정 (여정, 오늘의 도전, 이벤트)
+    missions.js       🎯 판 안 미션
     progress.js       판 끝 보상, 가게 강화, 줄 레벨, 랭킹 점수
     cards.js          📜 레시피 카드
     daily.js          🏆 오늘의 도전 (같은 운, 하루 3번)
@@ -57,12 +58,13 @@ src/
     Chef.js           소환진 위에서 칼질하고 요리를 던지는 요리 하나
     Projectile.js     포물선으로 날아가는 요리
   panels/
-    RecipePanel.js    풀코스 레시피와 합작 요리 안내 창
+    RecipePanel.js    🍳 히든 요리 조합표와 합작 요리 안내 창
+    UpgradePanel.js   ⬆️ 줄 강화 창
   art/                산타 모자 도트 그림
   scenes/
     BootScene.js      가장 먼저 열려서 그림을 준비
     TitleScene.js     첫 화면 (모험, 이벤트, 오늘의 도전, 주문서, 메뉴)
-    MapScene.js       🗺️ 동네 지도
+    JourneyScene.js   🗺️ 여정 (출발 동네 고르기, 이어 하기)
     DeckScene.js      🃏 덱 고르기
     GameScene.js      게임 화면 (웨이브, 뽑기, 칼질, 던지기, 합치기, 튜토리얼, 승패)
     ShopScene.js      🏪 가게 (상자, 도구, 꾸미기, 강화)

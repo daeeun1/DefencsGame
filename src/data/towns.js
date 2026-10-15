@@ -1,5 +1,5 @@
-// 🗺️ 동네 지도: 동네 6개 × 스테이지 10개.
-// 스테이지를 깨면 다음 스테이지가 열리고, 동네 마지막(10번) 스테이지에서 보스 손님 배를 채우면 다음 동네가 열린다.
+// 🗺️ 동네 6개. 한 판(여정)은 동네 1부터 차례로 이어지고, 동네마다 10웨이브 + 보스.
+// 보스를 이기면 다음 동네로 넘어가고, 다음 판부터는 이긴 동네의 다음 동네에서 출발할 수도 있다.
 // 새 동네가 열릴 때마다 기능이나 레시피 줄이 하나씩 늘어난다 (opens, newLine).
 //
 // mix: 이 동네에 나오는 손님과 비율. from: 이 스테이지부터 나온다
@@ -10,9 +10,9 @@
 
 import { getSave } from '../save.js';
 
-export const STAGES_PER_TOWN = 10;
+export const STAGES_PER_TOWN = 10; // (예전 스테이지 방식: 기록을 이어받을 때만 쓴다)
 
-// 별 기준: 스테이지 동안 레일에 가장 많이 쌓였던 손님 수 / 식당 자리
+// 별 기준: 그 동네 10웨이브 동안 레일에 가장 많이 쌓였던 손님 수 / 식당 자리
 export const STAR_LINES = { three: 0.35, two: 0.65 };
 
 export const TOWNS = [
@@ -139,49 +139,44 @@ export const TOWNS = [
   },
 ];
 
-export function stageId(town, stage) {
-  return `${TOWNS[town].id}-${stage}`;
+// ───────── 🗺️ 여정 진행 ─────────
+// 한 판(여정)은 웨이브 1부터 쭉 이어진다. 동네 하나가 10웨이브이고, 10웨이브마다 그 동네 보스가 나온다.
+
+export const TOWN_WAVES = 10;
+
+// 웨이브가 몇 번째 동네인지 (0~5, 60웨이브 뒤로는 마지막 동네)
+export function townOfWave(wave) {
+  return Math.min(TOWNS.length - 1, Math.floor((wave - 1) / TOWN_WAVES));
 }
 
-// 스테이지 최고 별 (안 깼으면 0)
-export function stageStars(town, stage) {
-  return getSave().stages?.[stageId(town, stage)] ?? 0;
+// 보스를 이긴 가장 먼 웨이브 (10, 20, …). 예전 스테이지 기록도 이어받는다
+export function bossBeaten() {
+  const save = getSave();
+  let beaten = save.bossBeaten ?? 0;
+  TOWNS.forEach((t, i) => {
+    if (save.stages?.[`${t.id}-${STAGES_PER_TOWN}`]) beaten = Math.max(beaten, (i + 1) * TOWN_WAVES);
+  });
+  return beaten;
 }
 
-// 이 스테이지를 할 수 있는지: 첫 스테이지이거나 바로 앞 스테이지를 깼으면
-export function isStageOpen(town, stage) {
-  if (town === 0 && stage === 1) return true;
-  if (stage === 1) return stageStars(town - 1, STAGES_PER_TOWN) > 0;
-  return stageStars(town, stage - 1) > 0;
-}
-
-// 열린 동네 수 (1~6). 동네 마지막 스테이지를 깨면 다음 동네가 열린다
+// 열린 동네 수 (1~6): 보스를 이긴 동네의 다음 동네까지
 export function townsOpen() {
-  let open = 1;
-  while (open < TOWNS.length && stageStars(open - 1, STAGES_PER_TOWN) > 0) open += 1;
-  return open;
+  return Math.min(TOWNS.length, Math.floor(bossBeaten() / TOWN_WAVES) + 1);
 }
 
-// 동네 6 보스까지 깼는지 (♾️ 무한 모드)
+// 동네 6 보스까지 이겼는지
 export function allTownsCleared() {
-  return stageStars(TOWNS.length - 1, STAGES_PER_TOWN) > 0;
+  return bossBeaten() >= TOWNS.length * TOWN_WAVES;
 }
 
-// 다음에 할 스테이지 (안 깬 첫 스테이지, 다 깼으면 마지막)
-export function nextStage() {
-  for (let town = 0; town < TOWNS.length; town++) {
-    for (let stage = 1; stage <= STAGES_PER_TOWN; stage++) {
-      if (stageStars(town, stage) === 0) return { town, stage };
-    }
-  }
-  return { town: TOWNS.length - 1, stage: STAGES_PER_TOWN };
-}
-
-// 동네 하나에서 모은 별
+// 동네 별 (0~3): 보스를 이기면 ⭐, 그 동네에서 손님을 적게 쌓을수록 ⭐⭐, ⭐⭐⭐
 export function townStars(town) {
-  let sum = 0;
-  for (let stage = 1; stage <= STAGES_PER_TOWN; stage++) sum += stageStars(town, stage);
-  return sum;
+  return getSave().townStars?.[town] ?? 0;
+}
+
+// 가장 멀리 간 웨이브
+export function bestWave() {
+  return getSave().bestWave ?? 0;
 }
 
 // ───────── 동네가 열리면 쓸 수 있는 기능 ─────────

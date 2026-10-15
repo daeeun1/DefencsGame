@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, TILE, BOARD_COLS, BOARD_ROWS, BOARD_X, gameLayout, COLORS, FONT, EMOJI_FONT } from '../config.js';
 import { WAVE_DURATION, START_GOLD, SPAWN_SPREAD, SUMMON_ODDS, MAX_MERGE_TIER, BOSS_PATIENCE, BOSS_WAVE_ORDER_RATIO, HAND_POWER_MAX, HAND_POWER_REGEN, LINE_UPGRADE_MAX, LINE_UPGRADE_BONUS, SWAP_MAX_TIER, summonCost, sellPrice, lineUpgradeCost, swapCost } from '../data/balance.js';
-import { METHODS, TIERS, RECIPES, HEAD_CHEF_CHANCE, LINES, STARTER_LINES, chefById, chefsOfTier, nextInLine } from '../data/chefs.js';
+import { METHODS, TIERS, RECIPES, HEAD_CHEF_CHANCE, LINES, STARTER_LINES, chefById, chefsOfTier, nextInLine, rankOf } from '../data/chefs.js';
 import { MONSTERS, LIKE_MULTIPLIER, PICKY_MULTIPLIER, MONSTER_COLORS } from '../data/monsters.js';
 import { setFor, COMBO_CHARGE, COMBO_POWER } from '../data/sets.js';
 import { createButton, createCommandButton } from '../ui.js';
@@ -24,16 +24,17 @@ import Chef from '../objects/Chef.js';
 import Projectile from '../objects/Projectile.js';
 import RecipePanel from '../panels/RecipePanel.js';
 import UpgradePanel from '../panels/UpgradePanel.js';
-import { getSave, writeSave, shopLevel, lineLevel, discover } from '../save.js';
+import { getSave, writeSave, shopLevel, lineLevel, discover, isDiscovered } from '../save.js';
 import { SHOP_ITEMS, TIPS_PER_ORDER, TIPS_PER_STAR, LINE_DAMAGE_PER_LEVEL, runScore, runLineXp, lineLevelOf } from '../data/progress.js';
 import { submitScore } from '../cloud.js';
 import { seededRandom, triesLeft } from '../data/daily.js';
 import { mergeRules } from '../data/rules.js';
-import { cardsForDeck, emptyCardFx, addCardFx } from '../data/cards.js';
-import { stageRun } from '../data/runs.js';
+import { CARDS, cardsForDeck, emptyCardFx, addCardFx } from '../data/cards.js';
+import { journeyRun, startKit } from '../data/runs.js';
 import { EVENT_BONUS } from '../data/events.js';
+import { MISSIONS, rewardText, missionGold } from '../data/missions.js';
 import { equippedEffects, worn } from '../data/items.js';
-import { TOWNS, STAGES_PER_TOWN, STAR_LINES, stageStars, townsOpen, FEATURE_TOWN } from '../data/towns.js';
+import { TOWNS, STAR_LINES, townsOpen, townOfWave, FEATURE_TOWN } from '../data/towns.js';
 import { addQuestProgress } from '../data/quests.js';
 
 // 가게 강화 효과 = 레벨 × 한 단계당 효과
@@ -43,6 +44,9 @@ function shopBonus(id) {
 
 // 배속 버튼을 누를 때마다 이 순서로 바뀐다
 const SPEEDS = [1, 2, 3];
+
+// 🎯 미션 하나를 할 수 있는 웨이브 수
+const MISSION_WAVES = 3;
 
 // 🥚 이스터 에그 확률
 const DISHWASHER_CHANCE = 0.001; // 뽑기에서 설거지 담당이 나올 확률 (0.1%)
@@ -66,7 +70,9 @@ export default class GameScene extends Phaser.Scene {
 
   // data.run: 이번 판의 설정 (data/runs.js). 없으면 동네 1-1
   create(data) {
-    this.run = data?.run ?? stageRun(data?.stage?.town ?? 0, data?.stage?.stage ?? 1, getSave().deck);
+    // data.resume: 저장해 둔 여정 이어 하기, data.startTown: 여정 출발 동네
+    const resume = data?.resume ? getSave().journey : null;
+    this.run = data?.run ?? journeyRun(resume?.deck ?? getSave().deck, resume?.startTown ?? data?.startTown ?? 0);
     this.daily = this.run.daily ?? null; // 🏆 오늘의 도전이면 오늘의 정보 (같은 운을 만드는 씨앗)
     // 이번 판의 특별 규칙 (오늘의 도전 규칙 등)
     this.mod = mergeRules([this.run.rule ?? {}]);
@@ -113,13 +119,17 @@ export default class GameScene extends Phaser.Scene {
     this.comboCharge = new Map(); // 붙어 있는 두 요리의 합작 게이지 { '칸-칸': 찬 양 }
     this.links = []; // 지금 붙어 있는 합작 요리 연결
     // 이번 판에 쓸 수 있는 기능 (동네 지도에서 하나씩 열린다)
-    this.features = this.run.features;
+    this.features = { ...this.run.features };
     this.selectedChef = null;
     this.drag = null; // 끌고 있는 요리사 정보 { chef, startX, startY, moved }
     this.isOver = false;
     this.endReason = null;
     this.paused = false;
     this.tutorial = null; // 👆 튜토리얼 진행 (동네 1-1)
+    this.mission = null; // 🎯 지금 미션 { def, count }
+    this.missionsDone = 0;
+    this.cardRound = 0;
+    this.unlockedThisRun = [];
     this.lineLevels = null; // 레시피 줄 레벨 (처음 쓸 때 계산)
     this.choosingCard = false; // 📜 레시피 카드를 고르는 중이면 게임이 멈춘다
     this.cardFx = emptyCardFx(); // 이번 판에 고른 카드 효과 합계
@@ -176,7 +186,12 @@ export default class GameScene extends Phaser.Scene {
     this.lateNight = isLateNight();
 
     playMusic('game');
-    this.startWave(1);
+    this.town = -1; // 지금 동네 (여정)
+    this.townPeak = 0; // 이번 동네에서 가장 많이 쌓인 손님 (동네 별)
+    if (resume) this.restoreJourney(resume);
+    else if (this.run.startTown > 0) this.giveStartKit();
+    this.startWave(resume?.wave ?? this.run.startWave ?? 1);
+    this.nextMission(); // 🎯 첫 미션
     if (this.daily) this.quest('daily');
     this.specialDayGreeting();
   }
@@ -314,7 +329,7 @@ export default class GameScene extends Phaser.Scene {
     this.freezeTimeLeft = Math.max(0, this.freezeTimeLeft - dt);
     const frozen = this.freezeTimeLeft > 0;
     this.freezeOverlay.setVisible(frozen);
-    const rush = this.rushTimeLeft > 0 ? this.run.gimmick.factor : 1;
+    const rush = this.rushTimeLeft > 0 ? this.gimmick.factor : 1;
     for (const monster of [...this.monsters]) {
       const moveScale = (frozen ? (monster.isBoss ? 0.5 : 0) : 1) * rush * (this.mod.orderSpeed ?? 1);
       const dotDamage = monster.step(dt, moveScale);
@@ -343,6 +358,7 @@ export default class GameScene extends Phaser.Scene {
     // 5) 패배 / 다음 웨이브 / 클리어 판정
     if (this.isOver) return; // 보스를 처치해서 이번 프레임에 클리어했을 수 있다
     this.peakMonsters = Math.max(this.peakMonsters, this.monsters.length);
+    this.townPeak = Math.max(this.townPeak, this.monsters.length);
     if (this.monsters.length >= this.railLimit) {
       this.endGame('rail');
     } else if (this.waveTimeLeft <= 0) {
@@ -368,7 +384,17 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     // 📜 정해진 웨이브마다 레시피 카드 고르기
-    if (this.features.cards && this.run.cardWaves.includes(wave)) this.offerCards();
+    // 🗺️ 여정: 웨이브에 따라 기능, 주방 사고, 동네가 바뀐다
+    if (this.run.featuresAt) {
+      const before = this.features.combos;
+      this.features = this.run.featuresAt(wave);
+      if (this.features.combos && !before) this.updateSets();
+    }
+    this.gimmick = this.run.gimmickAt ? this.run.gimmickAt(wave) : this.run.gimmick;
+    if (this.run.kind === 'journey') this.enterTown(wave);
+    this.checkMissionTime();
+    const cardTime = this.run.cardAt ? this.run.cardAt(wave) : this.run.cardWaves.includes(wave);
+    if (this.features.cards && cardTime) this.offerCards();
     const bossKey = this.run.bossAt(wave);
 
     // 이번 웨이브에 나올 주문들을 미리 정해 두고, SPAWN_SPREAD초 동안 고르게 나눠서 내보낸다
@@ -396,7 +422,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.waveTimeLeft = WAVE_DURATION;
       if (wave > 1) sfx.wave();
-      if (wave === 1) {
+      if (wave === (this.run.startWave ?? 1) && !this.resumed) {
         this.showBanner(this.run.title, COLORS.textDark, 40);
         if (this.daily) this.log(`🍽️ ${this.daily.special.name}: ${this.daily.special.desc}`, COLORS.gold);
         this.firstTimeTips();
@@ -407,9 +433,10 @@ export default class GameScene extends Phaser.Scene {
 
   // 손님을 레일에 올린다. startDistance: 레일 위 어디서 시작할지 (암탉이 병아리로 나뉠 때 사용)
   spawnMonster(typeKey, startDistance = 0, options = {}) {
-    const monster = new Monster(this, this.rail, typeKey, this.wave, startDistance, { ...options, lines: this.deck });
+    const monster = new Monster(this, this.rail, typeKey, this.run.hpWave ?? this.wave, startDistance, { ...options, lines: this.deck });
     // 🍽️ 특별 규칙: 손님 배고픔, 추가 골드
-    const runHp = monster.isBoss ? this.run.bossHp * (this.run.bossScale?.(this.wave) ?? 1) : this.run.hp;
+    const value = (v) => (typeof v === 'function' ? v(this.wave) : v);
+    const runHp = monster.isBoss ? value(this.run.bossHp) : value(this.run.hp);
     const hpScale = runHp * (this.mod.orderHp ?? 1) * (monster.isBoss ? this.mod.bossHp ?? 1 : 1);
     if (hpScale !== 1) {
       monster.maxHp = Math.round(monster.maxHp * hpScale);
@@ -579,6 +606,7 @@ export default class GameScene extends Phaser.Scene {
   // 보스 손님 배를 채웠을 때: 마지막 보스면 클리어, 아니면 바로 다음 웨이브
   bossDefeated(boss) {
     this.quest('boss');
+    if (this.run.kind === 'journey') this.townCleared(boss);
     this.boss = null;
     this.bossesDefeated += 1;
     this.showBanner(`🎉 ${boss.type.name} 배부름!`, COLORS.gold, 44);
@@ -611,7 +639,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // 일정 시간마다 기믹 발동
-    const gimmick = this.run.gimmick;
+    const gimmick = this.gimmick;
     if (!gimmick) return;
     this.gimmickTimer += dt;
     if (this.gimmickTimer < gimmick.every) return;
@@ -876,6 +904,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.isOver || level >= LINE_UPGRADE_MAX || this.gold < cost) return;
     this.gold -= cost;
     this.lineUpgrades[line] = level + 1;
+    this.quest('upgrade');
     sfx.upgrade();
     for (const chef of this.chefs) {
       if (chef.stats.method !== line) continue;
@@ -902,6 +931,7 @@ export default class GameScene extends Phaser.Scene {
     const data = pick(options, this.rng.merge);
     this.gold -= cost;
     this.swapCount += 1;
+    this.quest('swap');
     const slot = chef.slot;
     this.removeChef(chef);
     const fresh = this.addChef(data, slot);
@@ -950,10 +980,69 @@ export default class GameScene extends Phaser.Scene {
     return odds;
   }
 
+  // ───────── 🎯 판 안 미션 ─────────
+
+  // 웨이브가 넘어갈 때: 시간이 다 된 미션은 다음 미션으로
+  checkMissionTime() {
+    if (!this.mission || this.wave <= this.mission.until) return;
+    this.log(`⌛ 미션 시간 끝: ${this.mission.def.text}`, '#b9a48f');
+    this.nextMission();
+  }
+
+  // 다음 미션을 고른다 (방금 한 미션과 다른 것, 열린 기능만)
+  nextMission() {
+    const last = this.mission?.def.id;
+    const pool = MISSIONS.filter(
+      (m) =>
+        m.id !== last &&
+        (!m.need || this.features[m.need]) &&
+        !(m.id === 'legend' && this.wave < 12) &&
+        !(m.id === 'hero' && this.wave < 4),
+    );
+    const def = pool[Math.floor(this.rng.cards() * pool.length)];
+    this.mission = { def, count: 0, until: this.wave + MISSION_WAVES }; // MISSION_WAVES웨이브 안에 못 하면 다음 미션
+    this.drawMission();
+  }
+
+  drawMission() {
+    const m = this.mission;
+    if (!m || !this.missionText) return;
+    this.missionText.setText(`🎯 ${m.def.emoji} ${m.def.text} ${Math.min(m.count, m.def.target)}/${m.def.target}`);
+    // 게이지 왼쪽 글자와 겹치지 않게 줄인다
+    const max = GAME_WIDTH - 60 - this.gaugeText.width - 20;
+    this.missionText.setScale(Math.min(1, max / this.missionText.width));
+  }
+
+  missionProgress(event, amount) {
+    const m = this.mission;
+    if (!m || this.isOver || m.def.event !== event) return;
+    m.count += amount;
+    if (m.count < m.def.target) return this.drawMission();
+    // 미션 완료: 보상
+    const reward = m.def.reward;
+    let text = rewardText(reward, this.wave);
+    if (reward.gold) this.gold += missionGold(reward.gold, this.wave);
+    if (reward.free) this.cardFx.freeSummons = (this.cardFx.freeSummons ?? 0) + reward.free;
+    if (reward.upgrade) {
+      const line = this.deck.filter((l) => this.lineUpgrades[l] < LINE_UPGRADE_MAX).sort((a, b) => this.lineUpgrades[a] - this.lineUpgrades[b])[0];
+      if (line) {
+        this.gold += lineUpgradeCost(this.lineUpgrades[line]);
+        this.upgradeLine(line);
+        text = `⬆️ ${METHODS[line].emoji} 무료 강화`;
+      }
+    }
+    this.missionsDone = (this.missionsDone ?? 0) + 1;
+    sfx.coin();
+    this.showBanner(`🎯 미션 성공!\n${m.def.emoji} ${m.def.text} → ${text}`, COLORS.gold, 32);
+    this.mission = null;
+    this.time.delayedCall(1200, () => !this.isOver && this.nextMission());
+  }
+
   // ───────── 📋 오늘의 주문서 ─────────
 
   // 퀘스트 진행. 다 하면 화면 위에 알림
   quest(event, amount = 1) {
+    this.missionProgress(event, amount);
     for (const q of addQuestProgress(event, amount)) {
       const toast = this.add
         .text(GAME_WIDTH / 2, this.layout.gauge.y + 70, `📋 주문서 완료! ${q.emoji} ${q.text}`, {
@@ -988,10 +1077,11 @@ export default class GameScene extends Phaser.Scene {
     const centerX = GAME_WIDTH / 2;
     const centerY = this.screenHeight / 2;
     const parts = [this.add.rectangle(0, 0, GAME_WIDTH, this.screenHeight, 0x000000, 0.75).setOrigin(0).setInteractive()];
-    const round = this.run.cardWaves.indexOf(this.wave) + 1;
+    this.cardRound = (this.cardRound ?? 0) + 1;
+    const round = this.cardRound;
     parts.push(
       this.add
-        .text(centerX, centerY - 330, `📜 레시피 카드 (${round}/${this.run.cardWaves.filter((w) => w <= this.run.totalWaves).length})`, {
+        .text(centerX, centerY - 330, `📜 레시피 카드 (${round}번째)`, {
           fontFamily: FONT,
           fontSize: '42px',
           fontStyle: 'bold',
@@ -1087,11 +1177,14 @@ export default class GameScene extends Phaser.Scene {
 
   // 별을 충분히 모아서 레시피가 열려 있는지
   isRecipeUnlocked(recipe) {
-    return this.features.mythic;
+    // 🟢 히든은 처음부터, 🔵 특별은 동네 2(합작 요리)부터, 🔴 풀코스는 동네 4부터
+    if (recipe.grade === 'fullcourse') return this.features.mythic;
+    if (recipe.grade === 'special') return this.features.combos;
+    return true;
   }
 
   canCraftAny() {
-    return this.features.mythic && RECIPES.some((r) => this.isRecipeUnlocked(r) && this.findIngredients(r));
+    return RECIPES.some((r) => this.isRecipeUnlocked(r) && this.findIngredients(r));
   }
 
   // 신화 만들기: 재료 요리사들이 사라지고, 첫 번째 재료가 있던 칸에 신화 요리사가 생긴다
@@ -1102,13 +1195,17 @@ export default class GameScene extends Phaser.Scene {
     const slot = ingredients[0].slot;
     for (const chef of ingredients) this.removeChef(chef);
     const data = chefById(recipe.result);
+    const first = !isDiscovered(data.id); // 처음 만든 히든 요리면 능력을 알려 준다
     this.addChef(data, slot);
     flash(this, 0xffd54f);
-    revealEffect(this, this.effectLayer, slot.x, slot.y, 5, TIERS[5].color);
+    const rank = rankOf(data);
+    revealEffect(this, this.effectLayer, slot.x, slot.y, 5, rank.color);
     sfx.mythic();
 
     this.recipePanel.close();
-    this.showBanner(`🍽️ 풀코스 완성!\n${data.emoji} ${data.name}`, colorToHex(TIERS[5].color), 44);
+    this.showBanner(`🍳 ${rank.name} 요리 완성!\n${data.emoji} ${data.name}`, colorToHex(rank.color), 44);
+    this.quest('hidden');
+    if (first) this.log(`[${rank.name}] ${data.emoji} ${data.name}: ${data.ability ?? METHODS[data.method].role}`, colorToHex(rank.color));
     this.updateHud();
   }
 
@@ -1320,6 +1417,7 @@ export default class GameScene extends Phaser.Scene {
     this.quest('merge');
     this.tutorialEvent('merge');
     if (data.tier === 4) this.quest('legend');
+    if (data.tier === 3) this.quest('hero');
     ring(this, this.effectLayer, slot.x, slot.y, 0xfff8ec, 70);
     revealEffect(this, this.effectLayer, slot.x, slot.y, data.tier, TIERS[data.tier].color);
     vibrate(30);
@@ -1448,9 +1546,10 @@ export default class GameScene extends Phaser.Scene {
     info.emoji.setText(s.emoji);
     const line = LINES.includes(s.method) ? ` · ${method.emoji} ${method.name} 줄` : '';
     info.title.setText(`${s.name}${line}`);
-    info.title.setColor(colorToHex(TIERS[s.tier].color === 0xb8b8b8 ? 0xfff8ec : TIERS[s.tier].color));
+    const rank = rankOf(s);
+    info.title.setColor(colorToHex(rank.color === 0xb8b8b8 ? 0xfff8ec : rank.color));
 
-    const parts = [TIERS[s.tier].name];
+    const parts = [rank.name];
     if (s.method === 'buff') {
       parts.push(`옆 칼질 속도 +${Math.round(s.buff.attackSpeed * 100)}%`);
     } else {
@@ -1522,7 +1621,8 @@ export default class GameScene extends Phaser.Scene {
       rail: `${this.wave}웨이브에서 배고픈 손님이 ${this.railLimit}명 쌓였어요`,
       boss: `${this.boss ? this.boss.type.name : '보스 손님'}이(가) 배고파서 화를 냈어요`,
     };
-    text(centerY - 360, cleared ? '🎉 영업 성공!' : '😵 식당이 망했어요...', 58, COLORS.text, true);
+    const headline = this.run.kind === 'journey' ? `🏁 웨이브 ${this.wave}까지 왔어요!` : cleared ? '🎉 영업 성공!' : '😵 식당이 망했어요...';
+    text(centerY - 360, headline, this.run.kind === 'journey' ? 46 : 58, COLORS.text, true);
     // 🥚 부엉이 평론가에게 지면 혹평 리뷰가 나온다
     if (reason === 'boss' && this.boss?.typeKey === 'owl') {
       text(centerY - 290, `🦉 "${Phaser.Utils.Array.GetRandom(CRITIC_REVIEWS)}"`, 22, '#ff8a8a').setWordWrapWidth(GAME_WIDTH - 80);
@@ -1582,89 +1682,46 @@ export default class GameScene extends Phaser.Scene {
       const retry = button(0, `다시 도전 (남은 ${left}번)`, () => this.restartRun(), { fontSize: 30 });
       if (left <= 0) retry.setLabel('오늘 도전 끝! 내일 또 만나요').setEnabled(false);
       button(110, '처음으로', () => this.scene.start('Title'), { color: 0x7d8594 });
-    } else if (this.run.kind === 'stage') {
-      const next = this.nextStageAfter();
-      let dy = 0;
-      if (cleared && next) {
-        button(dy, `▶ 다음 스테이지 ${next.town + 1}-${next.stage}`, () => this.scene.start('Map', { town: next.town, play: next }), { fontSize: 30, color: 0x3f9a4a });
-        dy += 110;
-      }
-      button(dy, '🔄 다시 하기', () => this.restartRun(), { fontSize: 30 });
-      button(dy + 110, '🗺️ 지도로', () => this.scene.start('Map', { town: this.run.town }), { fontSize: 30, color: 0x7d8594 });
+    } else if (this.run.kind === 'journey') {
+      button(0, '🗺️ 다시 출발', () => this.scene.start('Journey'), { fontSize: 30, color: 0x3f9a4a });
+      button(110, '처음으로', () => this.scene.start('Title'), { color: 0x7d8594 });
     } else {
       button(0, '🔄 다시 하기', () => this.restartRun(), { fontSize: 30 });
       button(110, '처음으로', () => this.scene.start('Title'), { color: 0x7d8594 });
     }
   }
 
-  // 별 받는 조건 (판 종류마다 다르다)
+  // 별 받는 조건
   starRules(stars) {
     const mark = (i) => (i < stars ? '✅' : '⬜');
-    if (this.run.kind === 'stage') {
-      const two = Math.floor(this.railLimit * STAR_LINES.two);
-      const three = Math.floor(this.railLimit * STAR_LINES.three);
-      return [`${mark(0)} 스테이지 클리어`, `${mark(1)} 손님을 ${two}명보다 적게 쌓기`, `${mark(2)} 손님을 ${three}명보다 적게 쌓기`];
-    }
     return [0, 1, 2].map((i) => `${mark(i)} 보스 손님 ${i + 1}명 배부르게`);
-  }
-
-  // 이 스테이지 다음 스테이지 (마지막이면 null)
-  nextStageAfter() {
-    const { town, stage } = this.run;
-    if (stage < STAGES_PER_TOWN) return { town, stage: stage + 1 };
-    if (town < TOWNS.length - 1) return { town: town + 1, stage: 1 };
-    return null;
   }
 
   // 같은 판을 처음부터 다시
   restartRun() {
     if (this.daily) return this.scene.start('Title', { startDaily: true }); // 도전 횟수 확인은 첫 화면에서
-    this.scene.restart({ run: this.run.kind === 'stage' ? stageRun(this.run.town, this.run.stage, this.deck) : { ...this.run, features: this.features } });
+    if (this.run.kind === 'journey') return this.scene.start('Journey');
+    this.scene.restart({ run: this.run });
   }
 
   // 팁 배율: 판 종류 보너스 × 특별 규칙
   tipRate() {
-    return this.run.tipBonus * (this.mod.tips ?? 1) * (1 + this.gear.tips);
+    const base = this.run.tipAt ? this.run.tipAt(this.wave) : this.run.tipBonus;
+    return base * (this.mod.tips ?? 1) * (1 + this.gear.tips);
   }
 
   // 판 끝 보상: 별과 팁을 계산해서 저장한다
   giveRewards() {
     const save = getSave();
-    let stars;
-    if (this.run.kind === 'stage') {
-      // 클리어하면 별 1개, 손님을 적게 쌓을수록 2개, 3개
-      const peak = this.peakMonsters / this.railLimit;
-      stars = this.endReason !== 'clear' ? 0 : peak < STAR_LINES.three ? 3 : peak < STAR_LINES.two ? 2 : 1;
-    } else {
-      stars = Math.min(3, this.bossesDefeated);
-    }
-    const tips = Math.round((this.monstersFed * TIPS_PER_ORDER + stars * TIPS_PER_STAR) * this.tipRate());
-
-    const unlocked = [];
+    const stars = Math.min(3, this.bossesDefeated);
+    const tips = Math.round((this.monstersFed * TIPS_PER_ORDER + this.bossesDefeated * TIPS_PER_STAR * 2) * this.tipRate());
+    const unlocked = [...(this.unlockedThisRun ?? [])];
     let newBest = false;
-    if (this.run.kind === 'stage') {
-      const before = townsOpen();
-      const best = stageStars(this.run.town, this.run.stage);
-      newBest = stars > best;
-      save.stages ??= {};
-      if (newBest) save.stages[this.run.id] = stars;
-      const after = townsOpen();
-      if (after > before) {
-        const town = TOWNS[after - 1];
-        unlocked.push(`새 동네: ${town.emoji} ${town.name}`);
-        unlocked.push(`새 기능: ${town.opens}`);
-        if (after === FEATURE_TOWN.daily) unlocked.push('🏆 오늘의 도전, 📋 주문서, 랭킹');
-        if (town.newLine && !save.lines.includes(town.newLine)) {
-          // 새 레시피 줄: 지금 줄들 중 가장 낮은 경험치의 80%를 갖고 시작한다
-          const lowest = Math.min(...save.lines.map((l) => save.lineXp[l] ?? 0));
-          save.lines.push(town.newLine);
-          save.lineXp[town.newLine] = Math.round(lowest * 0.8);
-          unlocked.push(`새 레시피 줄: ${METHODS[town.newLine].emoji} ${METHODS[town.newLine].name} (덱에 넣어 보세요)`);
-        }
-      }
-      if (this.endReason === 'clear' && this.run.town === TOWNS.length - 1 && this.run.stage === STAGES_PER_TOWN && newBest && best === 0) {
-        unlocked.push('♾️ 무한 모드');
-      }
+    if (this.run.kind === 'journey') {
+      // 🗺️ 가장 멀리 간 웨이브. 판이 끝났으니 중간 저장은 지운다
+      newBest = this.wave > (save.bestWave ?? 0);
+      save.bestWave = Math.max(save.bestWave ?? 0, this.wave);
+      save.journey = null;
     }
     // 🎉 이벤트 기간에 처음 깨면 보너스 팁
     let bonusTips = 0;
@@ -1700,11 +1757,14 @@ export default class GameScene extends Phaser.Scene {
     const save = getSave();
     save.seen ??= [];
     const tips = [];
-    if (this.run.kind === 'stage' && this.run.town === 0 && this.run.stage === 1 && stageStars(0, 1) === 0) this.startTutorial();
+    if (this.run.kind === 'journey' && this.run.startTown === 0 && !save.seen.includes('tutorial')) {
+      save.seen.push('tutorial');
+      this.startTutorial();
+    }
     if (this.features.combos && !save.seen.includes('combos')) tips.push(['combos', '🍱 합작 요리가 열렸어요!\n다른 줄 요리를 옆에 붙이면 같이 던져요']);
     if (this.features.cards && !save.seen.includes('cards')) tips.push(['cards', '📜 레시피 카드가 열렸어요!\n몇 웨이브마다 카드 1장을 골라요']);
     if (this.features.mythic && !save.seen.includes('mythic')) tips.push(['mythic', '🍽️ 풀코스 요리가 열렸어요!\n전설 요리를 모아 일시 정지 → 레시피에서 확인']);
-    if (this.run.gimmick && !save.seen.includes('gimmick')) tips.push(['gimmick', '🔥 주방 사고가 나요!\n불, 정전, 빠른 레일을 조심하세요']);
+    if (this.gimmick && !save.seen.includes('gimmick')) tips.push(['gimmick', '🔥 주방 사고가 나요!\n불, 정전, 빠른 레일을 조심하세요']);
     tips.forEach(([id, message], i) => {
       save.seen.push(id);
       this.time.delayedCall(1500 + i * 2600, () => this.showTip(message));
@@ -1858,9 +1918,8 @@ export default class GameScene extends Phaser.Scene {
     const cy = hud.y + hud.h / 2;
 
     // 웨이브
-    const labels = { daily: '🏆 도전', endless: '♾️ 무한', event: `${this.run.event?.emoji} 이벤트` };
-    const label = this.run.kind === 'stage' ? `${TOWNS[this.run.town].emoji} ${this.run.town + 1}-${this.run.stage}` : labels[this.run.kind];
-    this.add.text(38, cy - hud.h * 0.22, label, { fontFamily: FONT, fontSize: '20px', color: '#9aa4b2' }).setOrigin(0, 0.5);
+    const labels = { daily: '🏆 도전', journey: '🗺️ 여정', event: `${this.run.event?.emoji} 이벤트` };
+    this.hudLabel = this.add.text(38, cy - hud.h * 0.22, labels[this.run.kind], { fontFamily: FONT, fontSize: '20px', color: '#9aa4b2' }).setOrigin(0, 0.5);
     this.hudWave = this.add
       .text(38, cy + hud.h * 0.14, '', { fontFamily: FONT, fontSize: `${Math.round(hud.h * 0.38)}px`, fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0, 0.5);
@@ -1931,7 +1990,7 @@ export default class GameScene extends Phaser.Scene {
     gg.fillRoundedRect(12, gauge.y, GAME_WIDTH - 24, gauge.h, 14);
     this.gaugeFill = this.add.graphics();
     this.gaugeText = this.add
-      .text(GAME_WIDTH / 2, gauge.y + gauge.h / 2, '', {
+      .text(30, gauge.y + gauge.h / 2, '', {
         fontFamily: FONT,
         fontSize: `${Math.round(gauge.h * 0.52)}px`,
         fontStyle: 'bold',
@@ -1939,7 +1998,20 @@ export default class GameScene extends Phaser.Scene {
         stroke: '#14171c',
         strokeThickness: 4,
       })
-      .setOrigin(0.5);
+      .setOrigin(0, 0.5);
+    // 🎯 판 안 미션 (게이지 오른쪽)
+    this.missionText = this.add
+      .text(GAME_WIDTH - 30, gauge.y + gauge.h / 2, '', {
+        fontFamily: FONT,
+        fontSize: `${Math.round(gauge.h * 0.46)}px`,
+        fontStyle: 'bold',
+        color: COLORS.gold,
+        stroke: '#14171c',
+        strokeThickness: 4,
+      })
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true });
+    this.missionText.on('pointerup', () => this.mission && this.log(`🎯 미션: ${this.mission.def.text} → ${rewardText(this.mission.def.reward, this.wave)}`, COLORS.gold));
     this.hudCache = {};
   }
 
@@ -1980,7 +2052,7 @@ export default class GameScene extends Phaser.Scene {
         this.gaugeFill.fillStyle(color, 1);
         this.gaugeFill.fillRoundedRect(18, gauge.y + 6, Math.max(20, (GAME_WIDTH - 36) * fill), gauge.h - 12, 10);
       }
-      this.gaugeText.setText(`배고픈 손님 ${count} / ${this.railLimit}`);
+      this.gaugeText.setText(`🍽️ 손님 ${count}/${this.railLimit}`);
     }
 
     // 명령 버튼
@@ -2013,7 +2085,7 @@ export default class GameScene extends Phaser.Scene {
       this.recipeReady = ready;
       this.recipeButton.setVisible(ready);
       this.recipeBlink.paused = !ready;
-      if (ready) this.log('🍽️ 풀코스 요리를 만들 수 있어요!', COLORS.gold);
+      if (ready) this.log('🍳 히든 요리를 만들 수 있어요! 판 아래 버튼을 눌러 보세요', COLORS.gold);
     }
   }
 
@@ -2050,10 +2122,6 @@ export default class GameScene extends Phaser.Scene {
             else g.fillRect(x + 10, y + 10 + k * 26, TILE - 20, 8);
           }
           this.drawArrow(g, x + TILE / 2, y + TILE / 2, this.railDirection(col, row));
-        } else {
-          const checker = (col + row) % 2 === 0;
-          g.fillStyle((worn('floor')?.colors ?? this.run.floor)[checker ? 0 : 1], 1);
-          g.fillRect(x, y, TILE, TILE);
         }
       }
     }
@@ -2062,6 +2130,8 @@ export default class GameScene extends Phaser.Scene {
     g.strokeRoundedRect(BOARD_X - 4, this.boardY - 4, BOARD_COLS * TILE + 8, BOARD_ROWS * TILE + 8, 10);
 
     // 빈 소환진: 점선 타원
+    this.floorTiles = this.add.graphics(); // 판 안쪽 바닥 (여정에서 동네가 바뀌면 다시 칠한다)
+    this.drawFloor(this.run.floor);
     const pads = this.add.graphics();
     pads.lineStyle(4, 0x786e5f, 0.5);
     for (const slot of this.slots) {
@@ -2075,6 +2145,135 @@ export default class GameScene extends Phaser.Scene {
         pads.strokePath();
       }
     }
+  }
+
+  // 판 안쪽 바닥 체크무늬 (🎨 꾸민 바닥이 있으면 그 색)
+  drawFloor(colors) {
+    const floor = worn('floor')?.colors ?? colors;
+    const g = this.floorTiles;
+    g.clear();
+    for (let row = 1; row < BOARD_ROWS - 1; row++) {
+      for (let col = 1; col < BOARD_COLS - 1; col++) {
+        g.fillStyle(floor[(col + row) % 2 === 0 ? 0 : 1], 1);
+        g.fillRect(BOARD_X + col * TILE, this.boardY + row * TILE, TILE, TILE);
+      }
+    }
+  }
+
+  // ───────── 🗺️ 여정 ─────────
+
+  // 웨이브가 새 동네에 들어서면: 바닥, 이름, 동네 별 집계를 바꾸고, 그 동네 입구에서 중간 저장
+  enterTown(wave) {
+    const town = townOfWave(wave);
+    if (town === this.town) return;
+    const first = this.town === -1;
+    this.town = town;
+    this.townPeak = 0;
+    const t = TOWNS[town];
+    this.drawFloor(t.floor);
+    this.hudLabel?.setText(`${t.emoji} 동네 ${town + 1}`);
+    if (!first) {
+      this.showBanner(`${t.emoji} ${t.name} 도착!`, COLORS.gold, 46);
+      sfx.star(2);
+    }
+    if (wave > 1 && !this.resumed) this.saveJourney();
+    this.resumed = false;
+  }
+
+  // 동네 보스를 이기면: 동네 별, 다음 동네 열기, 새 레시피 줄, 보너스 골드
+  townCleared() {
+    const save = getSave();
+    const town = this.town;
+    const peak = this.townPeak / this.railLimit;
+    const stars = peak < STAR_LINES.three ? 3 : peak < STAR_LINES.two ? 2 : 1;
+    save.townStars ??= {};
+    const before = townsOpen();
+    if (stars > (save.townStars[town] ?? 0)) save.townStars[town] = stars;
+    save.bossBeaten = Math.max(save.bossBeaten ?? 0, this.wave);
+    save.bestWave = Math.max(save.bestWave ?? 0, this.wave);
+    const bonus = 100 + town * 60;
+    this.gold += bonus;
+    this.floatText(GAME_WIDTH / 2, this.boardY + 300, `🎁 보너스 골드 +${bonus}`, COLORS.gold, 30);
+    this.log(`${TOWNS[town].emoji} 동네 ${town + 1} 클리어! ${'⭐'.repeat(stars)} · 골드 +${bonus}`, COLORS.gold);
+    this.unlockedThisRun ??= [];
+    const after = townsOpen();
+    if (after > before) {
+      const next = TOWNS[after - 1];
+      this.unlockedThisRun.push(`새 동네: ${next.emoji} ${next.name} (다음 판부터 여기서 출발 가능)`);
+      if (after === FEATURE_TOWN.daily) this.unlockedThisRun.push('🏆 오늘의 도전, 📋 주문서, 랭킹');
+      if (next.newLine && !save.lines.includes(next.newLine)) {
+        // 새 레시피 줄: 지금 줄들 중 가장 낮은 경험치의 80%를 갖고 시작한다
+        const lowest = Math.min(...save.lines.map((l) => save.lineXp?.[l] ?? 0));
+        save.lines.push(next.newLine);
+        save.lineXp ??= {};
+        save.lineXp[next.newLine] = Math.round(lowest * 0.8);
+        this.unlockedThisRun.push(`새 레시피 줄: ${METHODS[next.newLine].emoji} ${METHODS[next.newLine].name} (덱에 넣어 보세요)`);
+        this.showBanner(`📖 새 레시피 줄!\n${METHODS[next.newLine].emoji} ${METHODS[next.newLine].name}`, COLORS.gold, 40);
+      }
+    }
+    writeSave();
+  }
+
+  // 중간 저장: 판 위 요리, 골드, 강화, 카드 (동네 입구마다)
+  saveJourney() {
+    const save = getSave();
+    save.journey = {
+      wave: this.wave,
+      startTown: this.run.startTown,
+      deck: this.deck,
+      gold: this.gold,
+      summonCount: this.summonCount,
+      swapCount: this.swapCount,
+      lineUpgrades: { ...this.lineUpgrades },
+      cards: this.pickedCards.map((c) => c.id),
+      chefs: this.chefs.map((c) => ({ id: c.stats.id, col: c.slot.col, row: c.slot.row })),
+      fed: this.monstersFed,
+      bosses: this.bossesDefeated,
+    };
+    writeSave();
+  }
+
+  // 이어 하기: 저장해 둔 판 상태로 되돌린다
+  restoreJourney(snap) {
+    this.resumed = true;
+    this.gold = snap.gold;
+    this.summonCount = snap.summonCount;
+    this.swapCount = snap.swapCount;
+    Object.assign(this.lineUpgrades, snap.lineUpgrades);
+    this.monstersFed = snap.fed;
+    this.bossesDefeated = snap.bosses;
+    for (const id of snap.cards) {
+      const card = CARDS.find((c) => c.id === id);
+      if (!card) continue;
+      this.pickedCards.push(card);
+      addCardFx(this.cardFx, card.fx);
+      if (card.fx?.railLimit) this.railLimit += card.fx.railLimit;
+    }
+    this.cardRound = snap.cards.length;
+    for (const { id, col, row } of snap.chefs) {
+      const slot = this.slots.find((s) => s.col === col && s.row === row);
+      const data = chefById(id);
+      if (slot && data && !slot.chef) this.addChef(data, slot);
+    }
+    this.features = this.run.featuresAt(snap.wave);
+    this.updateBuffs();
+    this.showBanner(`▶ 이어 하기\n웨이브 ${snap.wave}`, COLORS.gold, 44);
+  }
+
+  // 중간 동네에서 출발: 골드와 희귀·영웅 요리를 받고 시작한다
+  giveStartKit() {
+    const kit = startKit(this.run.startTown);
+    this.gold += kit.gold;
+    const place = (tier, count) => {
+      for (let i = 0; i < count; i++) {
+        const empty = this.emptySlots();
+        if (empty.length === 0) return;
+        this.addChef(pick(chefsOfTier(tier, this.deck)), pick(empty));
+      }
+    };
+    place(2, kit.rare);
+    place(3, kit.hero);
+    this.log(`🎒 출발 꾸러미: 골드 +${kit.gold}, 희귀 ${kit.rare}개, 영웅 ${kit.hero}개`, COLORS.gold);
   }
 
   // 판의 가장 바깥 줄이면 레일
@@ -2188,7 +2387,7 @@ export default class GameScene extends Phaser.Scene {
       this.boardY + (BOARD_ROWS - 0.5) * TILE,
       340,
       76,
-      '🍽️ 풀코스 만들기!',
+      '🍳 히든 요리 만들기!',
       () => {
         if (!this.isOver) this.recipePanel.open();
       },

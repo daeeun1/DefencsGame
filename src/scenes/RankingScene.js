@@ -8,7 +8,7 @@ import { fetchLeaderboard, nickname, setNickname, renameEverywhere, isOnline } f
 const ROW_HEIGHT = 50;
 const SHOW_ROWS = 15;
 
-// 🏆 랭킹 화면: 오늘의 도전(매일 새로), 무한 모드. 위쪽 탭으로 고른다.
+// 🏆 랭킹 화면: 오늘의 도전(매일 새로), 여정 최고 웨이브. 위쪽 탭으로 고른다.
 export default class RankingScene extends Phaser.Scene {
   constructor() {
     super('Ranking');
@@ -32,7 +32,7 @@ export default class RankingScene extends Phaser.Scene {
     const daily = todaysSpecial();
     const boards = [
       { id: daily.boardId, emoji: '🏆', name: '오늘의 도전' },
-      { id: 'endless', emoji: '♾️', name: '무한 모드' },
+      { id: 'endless', emoji: '🗺️', name: '여정 최고 웨이브' },
     ];
     const tabWidth = (GAME_WIDTH - 40) / boards.length;
     this.tabs = boards.map((kitchen, i) => {

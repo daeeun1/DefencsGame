@@ -6,8 +6,7 @@ import { getSave, writeSave } from '../save.js';
 import { ALL_LINES, METHODS, DECK_SIZE, chefsOfLine } from '../data/chefs.js';
 import { MONSTERS } from '../data/monsters.js';
 import { lineLevelOf } from '../data/progress.js';
-import { TOWNS, nextStage } from '../data/towns.js';
-import { stageRun } from '../data/runs.js';
+import { TOWNS, townsOpen } from '../data/towns.js';
 
 const CARD_W = 330;
 const CARD_H = 130;
@@ -20,10 +19,10 @@ export default class DeckScene extends Phaser.Scene {
     super('Deck');
   }
 
-  // data.from: 돌아갈 화면 ('Map' 또는 'Codex')
+  // data.from: 돌아갈 화면 ('Journey' 또는 'Codex')
   create(data) {
     playMusic('title');
-    this.from = data?.from ?? 'Map';
+    this.from = data?.from ?? 'Journey';
     const save = getSave();
     this.picked = [...save.deck];
 
@@ -33,13 +32,12 @@ export default class DeckScene extends Phaser.Scene {
     const back = this.add.text(24, 60, '←', { fontFamily: FONT, fontSize: '48px', color: COLORS.text }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start(this.from));
 
-    // 다음 스테이지 손님이 좋아하는 요리 (덱을 고르는 힌트)
-    const next = nextStage();
-    const run = stageRun(next.town, next.stage);
-    const guests = Object.keys(run.mix(99)).map((key) => MONSTERS[key]);
+    // 가장 먼 동네 손님이 좋아하는 요리 (덱을 고르는 힌트)
+    const town = TOWNS[townsOpen() - 1];
+    const guests = Object.keys(town.mix).map((key) => MONSTERS[key]);
     const wants = [...new Set(guests.map((m) => m.likes).filter((l) => l && l !== 'random'))];
     this.add
-      .text(GAME_WIDTH / 2, 160, `다음 ${TOWNS[next.town].emoji} ${next.town + 1}-${next.stage} 손님: ${guests.map((m) => m.emoji).join('')}`, {
+      .text(GAME_WIDTH / 2, 160, `${town.emoji} ${town.name} 손님: ${guests.map((m) => m.emoji).join('')}`, {
         fontFamily: EMOJI_FONT,
         fontSize: '26px',
         color: COLORS.text,

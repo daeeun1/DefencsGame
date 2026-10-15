@@ -1,10 +1,11 @@
 // 한 판의 설정 (run). 어떤 판이든 GameScene은 이 설정대로 진행한다.
-//   kind        'stage'(동네 스테이지) / 'daily'(오늘의 도전) / 'endless'(무한 모드) / 'event'(이벤트)
+//   kind        'journey'(여정: 한 판으로 쭉) / 'daily'(오늘의 도전) / 'event'(이벤트)
 //   title       시작할 때 보여 주는 이름
 //   totalWaves  이 웨이브까지 버티면 클리어 (무한 모드는 Infinity)
 //   bossAt(w)   그 웨이브에 나오는 보스 (없으면 undefined)
 //   mix(wave)   그 웨이브에 나오는 손님 비율
-//   hp, bossHp  손님, 보스 배고픔 배율
+//   hp, bossHp  손님, 보스 배고픔 배율 (함수면 웨이브마다 다르다)
+//   hpWave      손님 배고픔을 계산할 때 쓰는 웨이브 (여정은 hp 함수가 다 계산하므로 1)
 //   railLimit   식당 자리 (손님이 이만큼 쌓이면 망한다)
 //   gimmick     주방 사고 (없으면 null)
 //   floor       판 바닥 색 두 가지
@@ -14,7 +15,7 @@
 //   rule        특별 규칙 (오늘의 도전 등, rules.js의 mergeRules 형식)
 //   board       랭킹 이름 (없으면 랭킹에 안 올린다)
 
-import { TOWNS, STAGES_PER_TOWN, stageId, hasFeature, townsOpen } from './towns.js';
+import { TOWNS, STAGES_PER_TOWN, TOWN_WAVES, hasFeature, townsOpen, townOfWave, bestWave } from './towns.js';
 import { monsterMixForWave, RAIL_LIMIT } from './balance.js';
 import { STARTER_LINES } from './chefs.js';
 import { KITCHENS } from './kitchens.js';
@@ -28,33 +29,77 @@ function features() {
   return { combos: hasFeature('combos'), cards: hasFeature('cards'), mythic: hasFeature('mythic') };
 }
 
-// 🗺️ 동네 스테이지. town: 0~5, stage: 1~10
-export function stageRun(town, stage, deck = STARTER_LINES) {
-  const t = TOWNS[town];
-  const isBoss = stage === STAGES_PER_TOWN;
-  const totalWaves = t.waves + (isBoss ? 2 : 0);
-  const gimmickId = t.gimmicks?.[stage];
+// ───────── 🗺️ 여정: 한 판으로 쭉 ─────────
+// 웨이브 1~10 빵집 골목, 11~20 마을 시장 … 51~60 화산 바비큐, 61부터는 끝없이.
+// 10웨이브마다 그 동네 보스. 동네가 바뀌면 손님과 판 바닥이 바뀐다.
+// startTown: 출발할 동네 (보스를 이긴 동네의 다음 동네부터 고를 수 있다)
+
+export const JOURNEY = {
+  hpBase: 1.0, // 손님 배고픔 배율 (1웨이브)
+  hpGrowth: 1.15, // 웨이브마다 배고픔이 몇 배씩 커지는지
+  bossBase: 0.6, // 보스 배고픔 배율
+  bossGrowth: 1.45, // 동네(보스)마다 보스 배고픔이 몇 배씩 커지는지
+  railLimit: 40,
+};
+
+const BOSSES = ['owl', 'pig', 'lion', 'octopus', 'snowman', 'dragon'];
+
+// 동네 5, 6의 주방 사고: 웨이브마다 돌아가며
+const TOWN_GIMMICKS = { 4: ['sushi_bar', 'chinese', 'blackout'], 5: ['chinese', 'blackout', 'sushi_bar'] };
+
+export function journeyRun(deck = STARTER_LINES, startTown = 0) {
+  const startWave = startTown * TOWN_WAVES + 1;
+  const best = bestWave();
+  const reach = (wave) => Math.max(best, wave); // 한 번이라도 가 본 웨이브면 기능이 열려 있다
   return {
-    kind: 'stage',
-    town,
-    stage,
-    id: stageId(town, stage),
-    title: `${t.emoji} ${t.name} ${stage}`,
-    totalWaves,
-    bossAt: (wave) => (isBoss && wave === totalWaves ? t.boss : undefined),
-    mix: (wave) => townMix(t, stage, wave),
-    hp: t.hp * (1 + 0.07 * (stage - 1)),
-    bossHp: t.bossHp,
-    railLimit: 40,
-    gimmick: gimmickId ? GIMMICKS[gimmickId] : null,
-    floor: t.floor,
-    cardWaves: [4, 8, 12].filter((w) => w < totalWaves),
-    features: features(),
-    tipBonus: 1 + town * 0.25,
+    kind: 'journey',
+    startTown,
+    startWave,
+    title: startTown > 0 ? `${TOWNS[startTown].emoji} ${TOWNS[startTown].name}부터 출발!` : '🗺️ 여정 출발!',
+    totalWaves: Infinity,
+    bossAt: (wave) => (wave % TOWN_WAVES === 0 ? BOSSES[(wave / TOWN_WAVES - 1) % BOSSES.length] : undefined),
+    mix: (wave) => journeyMix(wave),
+    hp: (wave) => JOURNEY.hpBase * JOURNEY.hpGrowth ** (wave - 1),
+    hpWave: 1,
+    bossHp: (wave) => JOURNEY.bossBase * JOURNEY.bossGrowth ** Math.floor((wave - 1) / TOWN_WAVES) * (wave > 60 ? 1.5 : 1),
+    railLimit: JOURNEY.railLimit,
+    gimmickAt: (wave) => {
+      const list = TOWN_GIMMICKS[townOfWave(wave)];
+      return list ? GIMMICKS[list[wave % list.length]] : null;
+    },
+    floorAt: (wave) => TOWNS[townOfWave(wave)].floor,
+    floor: TOWNS[startTown].floor,
+    gimmick: null,
+    // 레시피 카드: 21웨이브부터 5웨이브마다 (21, 26, 31 …)
+    cardAt: (wave) => reach(wave) >= 21 && wave >= 21 && wave % 5 === 1,
+    cardWaves: [],
+    featuresAt: (wave) => ({ combos: reach(wave) >= 11, cards: reach(wave) >= 21, mythic: reach(wave) >= 31 }),
+    features: { combos: reach(startWave) >= 11, cards: reach(startWave) >= 21, mythic: reach(startWave) >= 31 },
+    tipBonus: 0.5,
+    tipAt: (wave) => 0.5 + 0.1 * townOfWave(wave),
     deck,
     rule: {},
-    // 웨이브마다 손님 수 (동네가 뒤로 갈수록 많아진다)
-    count: (wave) => 7 + Math.floor(wave / 2) + town,
+    board: 'endless',
+    count: (wave) => 7 + Math.floor(((wave - 1) % TOWN_WAVES) / 2) + townOfWave(wave) + Math.floor(Math.max(0, wave - 60) / 10),
+  };
+}
+
+// 여정의 손님 비율: 그 동네 손님 중 나올 차례가 된 손님 (from = 동네 안에서 몇 번째 웨이브부터)
+function journeyMix(wave) {
+  if (wave <= 2) return { mouse: 1 };
+  const town = TOWNS[townOfWave(wave)];
+  const local = ((wave - 1) % TOWN_WAVES) + 1;
+  const mix = {};
+  for (const [key, { w, from }] of Object.entries(town.mix)) if (local >= from) mix[key] = w;
+  return mix;
+}
+
+// 중간에서 출발할 때 받는 출발 꾸러미: 골드와 희귀·영웅 요리 (동네가 뒤일수록 많이)
+export function startKit(startTown) {
+  return {
+    gold: startTown * 180,
+    rare: Math.min(8, startTown * 2),
+    hero: Math.min(4, Math.max(0, startTown - 1)),
   };
 }
 
@@ -92,32 +137,6 @@ export function dailyRun() {
     rule: daily.special.rule,
     board: daily.boardId,
     count: (wave) => 8 + Math.floor(wave / 2),
-  };
-}
-
-// ♾️ 무한 모드: 끝없이 웨이브가 이어진다. 10웨이브마다 보스. 몇 웨이브까지 버티는지 랭킹
-export function endlessRun(deck = STARTER_LINES) {
-  const bosses = ['owl', 'pig', 'lion', 'octopus', 'snowman', 'dragon'];
-  return {
-    kind: 'endless',
-    title: '♾️ 무한 모드',
-    totalWaves: Infinity,
-    bossAt: (wave) => (wave % 10 === 0 ? bosses[(wave / 10 - 1) % bosses.length] : undefined),
-    mix: (wave) => monsterMixForWave(wave),
-    hp: 1.3,
-    bossHp: 0.6,
-    // 보스는 한 바퀴(60웨이브)를 돌 때마다 2배 더 배고프다
-    bossScale: (wave) => 2 ** Math.floor((wave - 1) / 60),
-    railLimit: RAIL_LIMIT,
-    gimmick: null,
-    floor: [0xf2d4c4, 0xe6b9a2],
-    cardWaves: [6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56],
-    features: { combos: true, cards: true, mythic: true },
-    tipBonus: 2,
-    deck,
-    rule: {},
-    board: 'endless',
-    count: (wave) => 8 + Math.floor(Math.min(wave, 60) / 2),
   };
 }
 
