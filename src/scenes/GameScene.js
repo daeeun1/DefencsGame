@@ -1151,7 +1151,7 @@ export default class GameScene extends Phaser.Scene {
   // 🔪 톡 눌러 칼질 돕기: 손 힘을 하나 쓰고 칼질을 한 번 대신 해 준다
   helpChop(chef) {
     if (this.hand < 1) {
-      this.floatText(chef.x, chef.y - 60, '손이 아파요 💦', '#9fd8ff', 20);
+      this.floatText(chef.x, chef.y - 60, '손이 아파요 💦 잠깐 쉬어요', '#9fd8ff', 20);
       return;
     }
     if (!chef.helpChop()) return;
@@ -1616,7 +1616,7 @@ export default class GameScene extends Phaser.Scene {
         times: 1,
         point: () => this.findPair() ?? this.mergeButton,
       },
-      { text: '요리를 톡! 누르면 칼질을 도와줘요 🔪\n(위쪽 🔪 막대가 손 힘이에요)', event: 'chop', times: 3, point: () => this.chefs[0] },
+      { text: '요리를 톡! 누르면 칼질을 도와줘요 🔪\n(너무 많이 누르면 손이 아파서 잠깐 쉬어요)', event: 'chop', times: 3, point: () => this.chefs[0] },
       { text: '😋 손님 배를 꽉 채우면 팁을 남겨요\n손님이 너무 많이 쌓이면 식당이 망해요!', event: null, times: 0, point: () => null },
     ];
   }
@@ -1769,12 +1769,6 @@ export default class GameScene extends Phaser.Scene {
       .text(338, cy + 2, '', { fontFamily: FONT, fontSize: `${Math.round(hud.h * 0.36)}px`, fontStyle: 'bold', color: COLORS.gold })
       .setOrigin(0, 0.5);
 
-    // 🔪 손 힘: 톡 눌러 칼질을 도울 수 있는 횟수
-    this.handX = 470;
-    this.add.text(this.handX, cy - hud.h * 0.16, '🔪', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(hud.h * 0.3)}px` }).setOrigin(0.5);
-    this.handBar = this.add.graphics();
-    this.handBarY = cy + hud.h * 0.22;
-
     // 일시 정지 버튼
     const size = hud.h - 26;
     const px = GAME_WIDTH - 26 - size / 2;
@@ -1859,18 +1853,6 @@ export default class GameScene extends Phaser.Scene {
     }
     this.hudTime.setText(`${Math.ceil(left)}`);
     this.hudTime.setColor(this.boss ? COLORS.danger : COLORS.text);
-
-    // 손 힘 막대
-    const handKey = Math.floor(this.hand);
-    if (cache.hand !== handKey) {
-      cache.hand = handKey;
-      const w = 64;
-      this.handBar.clear();
-      this.handBar.fillStyle(COLORS.panelDark, 1);
-      this.handBar.fillRoundedRect(this.handX - w / 2, this.handBarY - 6, w, 12, 6);
-      this.handBar.fillStyle(this.hand >= 1 ? 0x9fd8ff : 0x5a6270, 1);
-      this.handBar.fillRoundedRect(this.handX - w / 2, this.handBarY - 6, Math.max(8, (w * this.hand) / this.handMax()), 12, 6);
-    }
 
     // 레일 게이지
     const count = this.monsters.length;
