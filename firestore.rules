@@ -14,26 +14,27 @@ service cloud.firestore {
         && request.resource.data.save is map;
     }
 
-    // 🏆 랭킹 (주방 4곳 + 날짜별 오늘의 특선 daily_20261014): 누구나 볼 수 있고, 자기 기록만 올릴 수 있다.
-    // 점수는 게임과 같은 계산(등급×100000 + 웨이브×100 + 주문×5 + 별×1000)이어야 하고, 이전 기록보다 낮아질 수 없다.
+    // 🏆 랭킹 (날짜별 오늘의 도전 daily_20261014, 무한 모드 endless, 예전 주방 4곳): 누구나 볼 수 있고, 자기 기록만 올릴 수 있다.
+    // 점수는 게임과 같은 계산(등급×100000 + 웨이브×100 + 손님×5 + 별×1000)이어야 하고, 이전 기록보다 낮아질 수 없다.
+    // 무한 모드만 웨이브가 30을 넘을 수 있다.
     match /leaderboards/{kitchen}/scores/{uid} {
       allow read: if true;
       allow create, update: if request.auth != null
         && request.auth.uid == uid
-        && (kitchen in ['snack_bar', 'sushi_bar', 'chinese', 'blackout'] || kitchen.matches('daily_[0-9]{8}'))
+        && (kitchen in ['snack_bar', 'sushi_bar', 'chinese', 'blackout', 'endless'] || kitchen.matches('daily_[0-9]{8}'))
         && request.resource.data.keys().hasOnly(['name', 'score', 'grade', 'wave', 'stars', 'orders', 'updatedAt'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 10
         && request.resource.data.wave is int
         && request.resource.data.wave >= 1
-        && request.resource.data.wave <= 30
+        && request.resource.data.wave <= (kitchen == 'endless' ? 500 : 30)
         && request.resource.data.stars is int
         && request.resource.data.stars >= 0
         && request.resource.data.stars * 10 <= request.resource.data.wave
         && request.resource.data.orders is int
         && request.resource.data.orders >= 0
-        && request.resource.data.orders <= 1500
+        && request.resource.data.orders <= 30000
         && request.resource.data.grade is int
         && request.resource.data.grade >= 1
         && request.resource.data.grade <= 10

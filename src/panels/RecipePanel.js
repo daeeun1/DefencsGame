@@ -1,6 +1,5 @@
 import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { METHODS, RECIPES, chefById } from '../data/chefs.js';
-import { RECIPE_UNLOCK_STARS } from '../data/progress.js';
 import { createButton } from '../ui.js';
 import { SETS, LUNCHBOX } from '../data/sets.js';
 
@@ -14,7 +13,7 @@ const SET_SECTION_HEIGHT = 60 + SET_ROWS * SET_LINE_HEIGHT; // 합작 요리 안
 // 레시피마다 결과 요리사, 능력, 재료(갖췄으면 ✅, 없으면 ❌)와 "만들기" 버튼을 보여 준다.
 export default class RecipePanel {
   // hasChef(id): 판 위에 그 요리사가 있는지 알려 주는 함수
-  // isUnlocked(recipe): 별을 모아서 레시피가 열렸는지 알려 주는 함수
+  // isUnlocked(recipe): 레시피가 열렸는지 (동네 4가 열리면) 알려 주는 함수
   // onCraft(recipe): 만들기 버튼을 눌렀을 때 부르는 함수
   // deck: 이번 판 덱 (합작 요리 안내를 덱에 맞춰 보여 준다)
   constructor(scene, { deck, hasChef, isUnlocked, onCraft }) {
@@ -131,9 +130,9 @@ export default class RecipePanel {
         row.ingredientTexts[j].setText(`${have ? '✅' : '❌'} ${chef.emoji} ${chef.name}`);
         row.ingredientTexts[j].setColor(have ? COLORS.text : '#8a7a6a');
       });
-      // 잠긴 레시피: 별이 모자라면 만들 수 없다
+      // 잠긴 레시피: 동네 4가 열리기 전에는 만들 수 없다
       const unlocked = this.isUnlocked(row.recipe);
-      row.button.setLabel(unlocked ? '만들기' : `🔒 ⭐${RECIPE_UNLOCK_STARS[row.recipe.result]}개`);
+      row.button.setLabel(unlocked ? '만들기' : '🔒 동네 4');
       row.button.setEnabled(unlocked && ready);
     }
   }

@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, COLORS, FONT } from '../config.js';
 import { playMusic, sfx } from '../audio.js';
-import { KITCHENS } from '../data/kitchens.js';
 import { SCORE_RULE } from '../data/progress.js';
 import { todaysSpecial } from '../data/daily.js';
 import { fetchLeaderboard, nickname, setNickname, renameEverywhere, isOnline } from '../cloud.js';
@@ -9,7 +8,7 @@ import { fetchLeaderboard, nickname, setNickname, renameEverywhere, isOnline } f
 const ROW_HEIGHT = 50;
 const SHOW_ROWS = 15;
 
-// 🏆 랭킹 화면: 주방별 최고 점수 순위. 위쪽 탭으로 주방을 고른다.
+// 🏆 랭킹 화면: 오늘의 도전(매일 새로), 무한 모드. 위쪽 탭으로 고른다.
 export default class RankingScene extends Phaser.Scene {
   constructor() {
     super('Ranking');
@@ -29,11 +28,11 @@ export default class RankingScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
 
-    // 탭: 오늘의 도전(일일 랭킹) + 주방 4곳
+    // 탭: 오늘의 도전(일일 랭킹) + 무한 모드
     const daily = todaysSpecial();
     const boards = [
       { id: daily.boardId, emoji: '🏆', name: '오늘의 도전' },
-      ...KITCHENS.map((k) => ({ id: k.id, emoji: k.emoji, name: k.name })),
+      { id: 'endless', emoji: '♾️', name: '무한 모드' },
     ];
     const tabWidth = (GAME_WIDTH - 40) / boards.length;
     this.tabs = boards.map((kitchen, i) => {
@@ -42,7 +41,7 @@ export default class RankingScene extends Phaser.Scene {
       const label = this.add
         .text(x, 160, `${kitchen.emoji}\n${kitchen.name}`, {
           fontFamily: FONT,
-          fontSize: kitchen.name.length > 6 ? '13px' : '16px',
+          fontSize: '20px',
           color: COLORS.text,
           align: 'center',
         })
@@ -59,7 +58,7 @@ export default class RankingScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         215,
-        `높은 🏅등급이 먼저 · 점수 = 웨이브×${SCORE_RULE.wave} + 주문×${SCORE_RULE.order} + 별×${SCORE_RULE.star}`,
+        `점수 = 웨이브×${SCORE_RULE.wave} + 손님×${SCORE_RULE.order} + 별×${SCORE_RULE.star}`,
         { fontFamily: FONT, fontSize: '19px', color: '#b9a48f' },
       )
       .setOrigin(0.5);
@@ -113,7 +112,7 @@ export default class RankingScene extends Phaser.Scene {
       this.show(this.current);
     });
 
-    this.show(this.registry.get('kitchen') ?? KITCHENS[0].id);
+    this.show(daily.boardId);
   }
 
   async show(kitchenId) {
@@ -142,7 +141,7 @@ export default class RankingScene extends Phaser.Scene {
     this.fill(data.rows.slice(0, SHOW_ROWS));
     if (data.me) {
       this.myText.setText(
-        `나  ${data.me.rank}위  ${data.me.name}\n${data.me.grade ? `🏅${data.me.grade}등급 · ` : ''}${data.me.wave}웨이브 · ⭐${data.me.stars} · 주문 ${data.me.orders}`,
+        `나  ${data.me.rank}위  ${data.me.name}\n${data.me.wave}웨이브 · ⭐${data.me.stars} · 손님 ${data.me.orders}`,
       );
       this.myScore.setText(`${data.me.score % SCORE_RULE.grade}`);
     } else {
@@ -162,7 +161,7 @@ export default class RankingScene extends Phaser.Scene {
       row.bg.setFillStyle(data.me ? 0x7a4a2a : 0x3d2a1e);
       row.rank.setText(medals[i] ?? `${data.rank}`);
       row.name.setText(data.name);
-      row.detail.setText(`${data.grade ? `🏅${data.grade} · ` : ''}${data.wave}웨이브`);
+      row.detail.setText(`${data.wave}웨이브`);
       row.score.setText(`${data.score % SCORE_RULE.grade}`);
     });
   }

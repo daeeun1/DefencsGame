@@ -7,10 +7,14 @@ import { todaysSpecial, DAILY_TIP_BONUS, DAILY_TRIES, triesLeft, useTry } from '
 import { cloudStatus, linkedAccount, linkGoogle, onCloudChange } from '../cloud.js';
 import { canFullscreen, isFullscreen, toggleFullscreen } from '../fullscreen.js';
 import { todaysQuests, claimQuest, canClaimBonus, claimBonus, hasQuestReward, QUEST_REWARD, QUEST_BONUS } from '../data/quests.js';
+import { TOWNS, nextStage, hasFeature, FEATURE_TOWN } from '../data/towns.js';
+import { dailyRun, eventRun } from '../data/runs.js';
+import { currentEvent, EVENT_BONUS } from '../data/events.js';
 
 const TAB_BAR_HEIGHT = 130;
 
-// 첫 화면: 로고, 내 팁과 별, 큰 버튼 2개(영업 시작, 오늘의 도전), 아래 메뉴줄(가게, 도감, 랭킹, 설정).
+// 첫 화면: 로고, 내 팁과 별, 큰 버튼(모험, 오늘의 도전, 주문서), 아래 메뉴줄(가게, 레시피, 랭킹, 설정).
+// 처음에는 모험만 할 수 있고, 동네를 깰 때마다 다른 기능이 하나씩 열린다.
 export default class TitleScene extends Phaser.Scene {
   constructor() {
     super('Title');
@@ -24,23 +28,23 @@ export default class TitleScene extends Phaser.Scene {
     const save = getSave();
     playMusic('title');
 
-    // 주방 로고: 가운데 샐러드, 양옆에 빵과 케이크 (모두 이모지)
+    // 로고: 가운데 프라이팬, 양옆에 배고픈 생쥐와 강아지 손님 (모두 이모지)
     const logoY = top + 210;
     this.add.circle(centerX, logoY, 110, 0xf3e3c3).setStrokeStyle(8, 0xe85d3a);
-    const salad = this.add.text(centerX, logoY + 5, '🥗', { fontFamily: EMOJI_FONT, fontSize: '120px' }).setOrigin(0.5);
+    const pan = this.add.text(centerX, logoY + 5, '🍳', { fontFamily: EMOJI_FONT, fontSize: '120px' }).setOrigin(0.5);
     this.add.circle(centerX - 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
     this.add.circle(centerX + 165, logoY + 40, 62, 0xb8b8b8).setStrokeStyle(6, 0x3d2a1e);
-    const bread = this.add.text(centerX - 165, logoY + 40, '🍞', { fontFamily: EMOJI_FONT, fontSize: '64px' }).setOrigin(0.5).setAngle(-20);
-    const cake = this.add.text(centerX + 165, logoY + 40, '🍰', { fontFamily: EMOJI_FONT, fontSize: '64px' }).setOrigin(0.5).setAngle(10);
-    this.tweens.add({ targets: salad, y: salad.y - 10, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.tweens.add({ targets: bread, angle: -30, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.tweens.add({ targets: cake, angle: 20, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 200 });
+    const mouse = this.add.text(centerX - 165, logoY + 40, '🐭', { fontFamily: EMOJI_FONT, fontSize: '64px' }).setOrigin(0.5).setAngle(-15);
+    const dog = this.add.text(centerX + 165, logoY + 40, '🐶', { fontFamily: EMOJI_FONT, fontSize: '64px' }).setOrigin(0.5).setAngle(10);
+    this.tweens.add({ targets: pan, angle: { from: -8, to: 8 }, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: mouse, y: mouse.y - 12, duration: 350, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: dog, y: dog.y - 12, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 150 });
 
     this.add
       .text(centerX, top + 405, '쿡쿡!', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
     this.add
-      .text(centerX, top + 500, '레일 위 주문을 막아라!', { fontFamily: FONT, fontSize: '32px', color: COLORS.gold })
+      .text(centerX, top + 500, '배고픈 몬스터 손님을 배불리 먹여라!', { fontFamily: FONT, fontSize: '30px', color: COLORS.gold })
       .setOrigin(0.5);
     this.add
       .text(centerX, top + 570, `🪙 팁 ${save.tips}    ⭐ 별 ${totalStars()}`, {
@@ -53,22 +57,52 @@ export default class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 큰 버튼 2개
-    createButton(this, centerX, top + 730, 560, 140, '🔥 영업 시작', () => this.scene.start('KitchenSelect'), { fontSize: 48 });
-    const { special } = todaysSpecial();
-    createButton(this, centerX, top + 885, 560, 120, `🏆 오늘의 도전 (${triesLeft()}/${DAILY_TRIES})\n${special.emoji} ${special.name}`, () => this.showDaily(), {
-      fontSize: 32,
-      color: 0x8e4fc0,
+    // 🗺️ 모험: 다음에 할 스테이지가 있는 동네 지도로
+    const next = nextStage();
+    const town = TOWNS[next.town];
+    createButton(this, centerX, top + 730, 560, 140, `🗺️ 모험 ${next.town + 1}-${next.stage}\n${town.emoji} ${town.name}`, () => this.scene.start('Map', { town: next.town }), {
+      fontSize: 40,
     });
 
-    // 📋 오늘의 주문서 (받을 보상이 있으면 반짝)
+    // 🏆 오늘의 도전, 📋 주문서: 동네 1을 깨면 열린다
+    const dailyOpen = hasFeature('daily');
+    const lockText = `🔒 동네 ${FEATURE_TOWN.daily - 1}을 깨면 열려요`;
+    const { special } = todaysSpecial();
+    // 🎉 2주 이벤트
+    const event = currentEvent();
+    const eventButton = createButton(
+      this,
+      centerX,
+      top + 852,
+      560,
+      80,
+      dailyOpen ? `${event.emoji} ${event.name}  (${event.endsIn}일 남음)` : `${event.emoji} 이벤트 ${lockText}`,
+      () => this.showEvent(event),
+      { fontSize: dailyOpen ? 28 : 24, color: 0xc77d2e, enabled: dailyOpen },
+    );
+    eventButton.setAlpha(dailyOpen ? 1 : 0.7);
+
+    const dailyButton = createButton(
+      this,
+      centerX,
+      top + 960,
+      560,
+      110,
+      dailyOpen ? `🏆 오늘의 도전 (${triesLeft()}/${DAILY_TRIES})\n${special.emoji} ${special.name}` : `🏆 오늘의 도전\n${lockText}`,
+      () => this.showDaily(),
+      { fontSize: 32, color: 0x8e4fc0, enabled: dailyOpen },
+    );
+    dailyButton.setAlpha(dailyOpen ? 1 : 0.7);
+
     const quests = todaysQuests();
     const doneCount = quests.filter((q) => q.done).length;
-    const questButton = createButton(this, centerX, top + 1010, 560, 84, `📋 오늘의 주문서  ${doneCount}/${quests.length}`, () => this.showQuests(), {
-      fontSize: 30,
+    const questButton = createButton(this, centerX, top + 1067, 560, 76, dailyOpen ? `📋 오늘의 주문서  ${doneCount}/${quests.length}` : `📋 주문서 ${lockText}`, () => this.showQuests(), {
+      fontSize: dailyOpen ? 28 : 24,
       color: 0x3f7fd0,
+      enabled: dailyOpen,
     });
-    if (hasQuestReward()) {
+    questButton.setAlpha(dailyOpen ? 1 : 0.7);
+    if (dailyOpen && hasQuestReward()) {
       questButton.setLabel(`📋 오늘의 주문서  🎁 보상 받기!`);
       this.tweens.add({ targets: questButton, scale: 1.05, duration: 450, yoyo: true, repeat: -1 });
     }
@@ -89,7 +123,7 @@ export default class TitleScene extends Phaser.Scene {
   // 🏆 오늘의 도전 시작: 남은 횟수가 있으면 한 번 쓰고 시작한다
   startDaily() {
     if (!useTry()) return this.showDaily();
-    this.scene.start('Game', { daily: true });
+    this.scene.start('Game', { run: dailyRun() });
   }
 
   // 휴대폰 앱처럼 화면 맨 아래 메뉴줄: 아이콘 + 작은 글씨
@@ -97,25 +131,80 @@ export default class TitleScene extends Phaser.Scene {
     const y = height - TAB_BAR_HEIGHT;
     this.add.rectangle(0, y, GAME_WIDTH, TAB_BAR_HEIGHT, 0x3d2a1e).setOrigin(0);
     this.add.rectangle(0, y, GAME_WIDTH, 4, 0x1c120c).setOrigin(0);
+    // 잠긴 메뉴는 누르면 언제 열리는지 알려 준다
+    const locked = (feature) => () => this.toast(`🔒 동네 ${FEATURE_TOWN[feature] - 1}을 깨면 열려요`);
     const tabs = [
-      { emoji: '🏪', label: '가게', onClick: () => this.scene.start('Shop') },
-      { emoji: '📖', label: '도감', onClick: () => this.scene.start('Codex') },
-      { emoji: '🏆', label: '랭킹', onClick: () => this.scene.start('Ranking') },
-      { emoji: '⚙️', label: '설정', onClick: () => this.showSettings() },
+      { emoji: '🏪', label: '가게', open: hasFeature('shop'), onClick: () => this.scene.start('Shop'), onLocked: locked('shop') },
+      { emoji: '📖', label: '레시피', open: true, onClick: () => this.scene.start('Codex') },
+      { emoji: '🏆', label: '랭킹', open: hasFeature('daily'), onClick: () => this.scene.start('Ranking'), onLocked: locked('daily') },
+      { emoji: '⚙️', label: '설정', open: true, onClick: () => this.showSettings() },
     ];
     const width = GAME_WIDTH / tabs.length;
     tabs.forEach((tab, i) => {
       const x = width * i + width / 2;
       const hit = this.add.rectangle(x, y + TAB_BAR_HEIGHT / 2, width, TAB_BAR_HEIGHT, 0, 0).setInteractive({ useHandCursor: true });
-      const icon = this.add.text(x, y + 48, tab.emoji, { fontFamily: EMOJI_FONT, fontSize: '48px' }).setOrigin(0.5);
-      this.add.text(x, y + 98, tab.label, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5);
+      const icon = this.add.text(x, y + 48, tab.open ? tab.emoji : '🔒', { fontFamily: EMOJI_FONT, fontSize: '48px' }).setOrigin(0.5);
+      this.add
+        .text(x, y + 98, tab.label, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: tab.open ? COLORS.text : '#8a7a6a' })
+        .setOrigin(0.5);
       hit.on('pointerdown', () => icon.setScale(0.9));
       hit.on('pointerout', () => icon.setScale(1));
       hit.on('pointerup', () => {
         icon.setScale(1);
-        tab.onClick();
+        if (tab.open) tab.onClick();
+        else tab.onLocked();
       });
     });
+  }
+
+  // 🎉 이벤트 안내 창
+  showEvent(event) {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = this.scale.height / 2;
+    const done = getSave().events?.[event.key];
+    const shade = this.add.rectangle(0, 0, GAME_WIDTH, this.scale.height, 0x000000, 0.7).setOrigin(0).setInteractive();
+    const box = this.add.graphics();
+    box.fillStyle(0x3d2a1e, 1);
+    box.fillRoundedRect(centerX - 290, centerY - 300, 580, 600, 24);
+    box.lineStyle(5, 0xc77d2e, 1);
+    box.strokeRoundedRect(centerX - 290, centerY - 300, 580, 600, 24);
+    const text = (y, message, size, color = COLORS.text, bold = false) =>
+      this.add
+        .text(centerX, y, message, { fontFamily: FONT, fontSize: `${size}px`, fontStyle: bold ? 'bold' : '', color, align: 'center', wordWrap: { width: 520 } })
+        .setOrigin(0.5);
+    const parts = [
+      shade,
+      box,
+      this.add.text(centerX, centerY - 200, event.emoji, { fontFamily: EMOJI_FONT, fontSize: '96px' }).setOrigin(0.5),
+      text(centerY - 100, event.name, 38, COLORS.gold, true),
+      text(centerY - 30, event.desc, 24),
+      text(centerY + 50, `${event.endsIn}일 남음 · 15웨이브 · 지금 가장 먼 동네 난이도`, 22, '#d8c8b4'),
+      text(centerY + 110, done ? '✅ 이번 이벤트 보너스를 받았어요' : `🎁 처음 깨면 🪙${EVENT_BONUS} 보너스`, 26, done ? '#b9c2cf' : COLORS.gold, true),
+    ];
+    const close = () => parts.forEach((p) => p.destroy());
+    parts.push(
+      createButton(this, centerX - 130, centerY + 220, 220, 96, '닫기', close, { color: 0x7d8594 }),
+      createButton(this, centerX + 130, centerY + 220, 220, 96, '▶ 시작', () => this.scene.start('Game', { run: eventRun(event, getSave().deck) }), {
+        color: 0x3f9a4a,
+      }),
+    );
+    for (const p of parts) p.setDepth(20);
+  }
+
+  // 화면 아래쪽에 잠깐 나오는 알림
+  toast(message) {
+    const t = this.add
+      .text(GAME_WIDTH / 2, this.scale.height - 200, message, {
+        fontFamily: FONT,
+        fontSize: '26px',
+        fontStyle: 'bold',
+        color: COLORS.text,
+        backgroundColor: '#2b1d14',
+        padding: { x: 18, y: 12 },
+      })
+      .setOrigin(0.5)
+      .setDepth(30);
+    this.tweens.add({ targets: t, alpha: 0, delay: 1600, duration: 400, onComplete: () => t.destroy() });
   }
 
   // 📋 오늘의 주문서 창: 퀘스트 3개, 진행 막대, 보상 받기
@@ -248,7 +337,7 @@ export default class TitleScene extends Phaser.Scene {
     parts.push(status, link);
 
     parts.push(
-      this.add.text(centerX, centerY + 290, 'v0.10 · 개발 중', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' }).setOrigin(0.5),
+      this.add.text(centerX, centerY + 290, 'v0.20 · 개발 중', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' }).setOrigin(0.5),
     );
     const close = () => {
       off();
@@ -281,8 +370,8 @@ export default class TitleScene extends Phaser.Scene {
       this.add.text(centerX, centerY - 130, special.emoji, { fontFamily: EMOJI_FONT, fontSize: '84px' }).setOrigin(0.5),
       text(centerY - 50, special.name, 40, COLORS.gold, true),
       text(centerY + 10, special.desc, 24),
-      text(centerY + 55, `주방: ${kitchen.emoji} ${kitchen.name} (잠긴 주방도 OK)`, 22, '#d8c8b4'),
-      text(centerY + 118, `🎲 오늘은 모두 같은 운! 실력으로 겨뤄요\n🏅3 등급 · 팁 ×${DAILY_TIP_BONUS} · 일일 랭킹`, 22, '#d8c8b4'),
+      text(centerY + 55, `주방: ${kitchen.emoji} ${kitchen.name}${kitchen.gimmick ? ` · ${kitchen.desc}` : ''}`, 22, '#d8c8b4'),
+      text(centerY + 118, `🎲 오늘은 모두 같은 운, 같은 덱(기본 4줄)!\n30웨이브 · 팁 ×${DAILY_TIP_BONUS * 1.5} · 일일 랭킹`, 22, '#d8c8b4'),
       text(centerY + 190, `남은 도전 ${triesLeft()} / ${DAILY_TRIES}`, 28, triesLeft() > 0 ? COLORS.gold : '#ff8a8a', true),
     ];
     const close = () => parts.forEach((p) => p.destroy());

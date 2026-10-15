@@ -1,16 +1,21 @@
 // 영구 성장 기록 저장.
 // 휴대폰 브라우저(앱으로 포장한 뒤에는 앱) 안에 저장되어, 게임을 껐다 켜도 남는다.
 
-import { LEGACY_IDS } from './data/chefs.js';
+import { LEGACY_IDS, STARTER_LINES, chefById } from './data/chefs.js';
+import { lineLevelOf, lineXpForLevel } from './data/progress.js';
 
 const KEY = 'kitchen-defense-save-v1';
 
 function defaultSave() {
   return {
-    tips: 0, // 🪙 팁 (가게 강화, 도감 레벨업에 쓰는 재화)
-    bestStars: {}, // 주방별 최고 별 개수 { snack_bar: 2 }
+    tips: 0, // 🪙 팁 (가게 강화에 쓰는 재화)
+    stages: {}, // 🗺️ 스테이지별 최고 별 { 'bakery-3': 2 }
+    lines: [...STARTER_LINES], // 📖 모은 레시피 줄
+    deck: [...STARTER_LINES], // 판에 가져가는 4줄
+    lineXp: {}, // 줄별 경험치 { cut: 120 }
+    seen: [], // 한 번 본 안내 { 'combos', ... }
     shop: {}, // 가게 강화 레벨 { startGold: 1 }
-    codex: {}, // 유닛별 도감 레벨 { flour: 2 }
+    codex: {}, // (예전) 유닛별 도감 레벨. 줄 레벨로 옮긴다
     discovered: [], // 한 번이라도 만난 요리사 id 목록
     runs: 0, // 플레이한 판 수
     settings: { sfx: true, music: true, vibration: true }, // 효과음, 배경음악, 진동
@@ -43,6 +48,17 @@ function migrateLegacyIds(save) {
     }
   }
   save.discovered = [...new Set(save.discovered.map((id) => LEGACY_IDS[id] ?? id))];
+
+  // 예전 유닛별 도감 레벨 → 레시피 줄 레벨 (그 줄에서 가장 높은 도감 레벨만큼)
+  if (!save.codexMoved) {
+    save.lineXp ??= {};
+    for (const [id, level] of Object.entries(save.codex ?? {})) {
+      const line = chefById(id)?.method;
+      if (!line || !level) continue;
+      save.lineXp[line] = Math.max(save.lineXp[line] ?? 0, lineXpForLevel(level));
+    }
+    save.codexMoved = true;
+  }
 }
 
 // 지금 기록을 저장한다 (휴대폰에 저장하고, 클라우드에도 올리도록 알린다)
@@ -71,17 +87,18 @@ export function replaceSave(data) {
   writeLocal();
 }
 
-// 모든 주방의 최고 별을 더한 값
+// 모든 스테이지의 최고 별을 더한 값
 export function totalStars() {
-  return Object.values(getSave().bestStars).reduce((sum, n) => sum + n, 0);
+  return Object.values(getSave().stages ?? {}).reduce((sum, n) => sum + n, 0);
 }
 
 export function shopLevel(id) {
   return getSave().shop[id] ?? 0;
 }
 
-export function codexLevel(id) {
-  return getSave().codex[id] ?? 0;
+// 레시피 줄 레벨 (경험치로 계산)
+export function lineLevel(line) {
+  return lineLevelOf(getSave().lineXp?.[line] ?? 0).level;
 }
 
 export function isDiscovered(id) {

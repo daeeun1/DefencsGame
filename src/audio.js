@@ -66,9 +66,10 @@ export function toggle(kind) {
 const midiToFreq = (n) => 440 * 2 ** ((n - 69) / 12);
 
 // 음 하나: 주파수, 길이(초), 파형, 크기, 끝 주파수(미끄러지기), 시작 지연
-function tone(freq, duration, { type = 'square', volume = 0.3, slideTo = null, delay = 0, out = sfxGain } = {}) {
-  const c = audio();
+function tone(freq, duration, { type = 'square', volume = 0.3, slideTo = null, delay = 0, out = null } = {}) {
+  const c = audio(); // 처음 부를 때 소리 장치를 만든다 (그 뒤에 sfxGain이 생긴다)
   if (!c || c.state !== 'running') return;
+  out ??= sfxGain;
   const t = c.currentTime + delay;
   const osc = c.createOscillator();
   const gain = c.createGain();
@@ -83,9 +84,10 @@ function tone(freq, duration, { type = 'square', volume = 0.3, slideTo = null, d
 }
 
 // 치익 하는 잡음 (불, 북소리 등)
-function noise(duration, { volume = 0.2, delay = 0, highpass = 1000, out = sfxGain } = {}) {
+function noise(duration, { volume = 0.2, delay = 0, highpass = 1000, out = null } = {}) {
   const c = audio();
   if (!c || c.state !== 'running') return;
+  out ??= sfxGain;
   const t = c.currentTime + delay;
   const buffer = c.createBuffer(1, Math.ceil(c.sampleRate * duration), c.sampleRate);
   const data = buffer.getChannelData(0);
