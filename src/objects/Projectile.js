@@ -34,6 +34,12 @@ export default class Projectile extends Phaser.GameObjects.Text {
     const y = this.start.y + (this.targetPos.y - this.start.y) * t - Math.sin(t * Math.PI) * this.arc;
     this.setPosition(x, y);
     this.angle += this.spin * dt;
+    // 🎨 던지기 꼬리 (0.06초마다 하나)
+    this.trailTimer = (this.trailTimer ?? 0) + dt;
+    if (this.scene.trail && this.trailTimer >= 0.06) {
+      this.trailTimer = 0;
+      this.scene.dropTrail(x, y);
+    }
 
     if (t >= 1) {
       this.done = true;

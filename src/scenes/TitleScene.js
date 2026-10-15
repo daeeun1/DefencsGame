@@ -10,6 +10,8 @@ import { todaysQuests, claimQuest, canClaimBonus, claimBonus, hasQuestReward, QU
 import { TOWNS, nextStage, hasFeature, FEATURE_TOWN } from '../data/towns.js';
 import { dailyRun, eventRun } from '../data/runs.js';
 import { currentEvent, EVENT_BONUS } from '../data/events.js';
+import { freeBoxReady } from '../data/items.js';
+import { THEMES } from '../data/cosmetics.js';
 
 const TAB_BAR_HEIGHT = 130;
 
@@ -56,6 +58,10 @@ export default class TitleScene extends Phaser.Scene {
         padding: { x: 28, y: 12 },
       })
       .setOrigin(0.5);
+
+    // 🏅 꾸미기 세트 칭호
+    const title = THEMES.find((t) => t.id === save.wear?.title)?.title;
+    if (title) this.add.text(centerX, top + 628, title, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: COLORS.gold }).setOrigin(0.5);
 
     // 🗺️ 모험: 다음에 할 스테이지가 있는 동네 지도로
     const next = nextStage();
@@ -147,6 +153,11 @@ export default class TitleScene extends Phaser.Scene {
       this.add
         .text(x, y + 98, tab.label, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: tab.open ? COLORS.text : '#8a7a6a' })
         .setOrigin(0.5);
+      // 🆓 무료 상자를 열 수 있으면 가게에 빨간 점
+      if (tab.label === '가게' && tab.open && freeBoxReady()) {
+        this.add.circle(x + 30, y + 22, 13, 0xe8564a).setStrokeStyle(3, 0xfff8ec);
+        this.add.text(x + 30, y + 22, '!', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5);
+      }
       hit.on('pointerdown', () => icon.setScale(0.9));
       hit.on('pointerout', () => icon.setScale(1));
       hit.on('pointerup', () => {
@@ -222,7 +233,7 @@ export default class TitleScene extends Phaser.Scene {
       shade,
       box,
       this.add.text(centerX, centerY - 320, '📋 오늘의 주문서', { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5),
-      this.add.text(centerX, centerY - 270, '매일 바뀌어요 · 다 하면 보너스!', { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' }).setOrigin(0.5),
+      this.add.text(centerX, centerY - 270, '매일 바뀌어요 · 🎟️ 상자 쿠폰은 가게에서 써요', { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' }).setOrigin(0.5),
     );
     todaysQuests().forEach((q, i) => {
       const y = centerY - 175 + i * 150;
@@ -241,7 +252,7 @@ export default class TitleScene extends Phaser.Scene {
         this.add.text(centerX - 200, y - 22, q.text, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0, 0.5),
         this.add.text(centerX + 70, y + 31, `${q.progress}/${q.target}`, { fontFamily: FONT, fontSize: '20px', color: '#d8c8b4' }).setOrigin(0, 0.5),
       );
-      const label = q.claimed ? '✅ 받음' : q.done ? `🪙 ${QUEST_REWARD} 받기` : `🪙 ${QUEST_REWARD}`;
+      const label = q.claimed ? '✅ 받음' : q.done ? `🎟️ ${QUEST_REWARD} 받기` : `🎟️ ${QUEST_REWARD}`;
       const button = createButton(this, centerX + 205, y + 10, 140, 70, label, () => {
         // 받으면 팁 숫자를 다시 그리고 창을 다시 연다
         if (claimQuest(q.id) > 0) this.scene.restart({ showQuests: true });
@@ -251,7 +262,7 @@ export default class TitleScene extends Phaser.Scene {
 
     const bonusReady = canClaimBonus();
     parts.push(
-      createButton(this, centerX, centerY + 270, 460, 80, bonusReady ? `🎁 모두 완료 보너스 🪙${QUEST_BONUS} 받기` : `🎁 3개 다 하면 🪙${QUEST_BONUS} 보너스`, () => {
+      createButton(this, centerX, centerY + 270, 460, 80, bonusReady ? `🎁 모두 완료 보너스 🎟️${QUEST_BONUS} 받기` : `🎁 3개 다 하면 상자 쿠폰 🎟️${QUEST_BONUS}장 더`, () => {
         if (claimBonus() > 0) this.scene.restart({ showQuests: true });
       }, { fontSize: 24, color: 0xc77d2e, enabled: bonusReady }),
     );

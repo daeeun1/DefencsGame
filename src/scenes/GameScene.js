@@ -31,7 +31,7 @@ import { mergeRules } from '../data/rules.js';
 import { cardsForDeck, emptyCardFx, addCardFx } from '../data/cards.js';
 import { stageRun } from '../data/runs.js';
 import { EVENT_BONUS } from '../data/events.js';
-import { equippedEffects, wornHat, wornFloor } from '../data/items.js';
+import { equippedEffects, worn } from '../data/items.js';
 import { TOWNS, STAGES_PER_TOWN, STAR_LINES, stageStars, townsOpen, FEATURE_TOWN } from '../data/towns.js';
 import { addQuestProgress } from '../data/quests.js';
 
@@ -91,7 +91,13 @@ export default class GameScene extends Phaser.Scene {
     // 가게 강화(영구 성장) 효과를 이번 판에 적용
     // 🔪 장착한 주방 도구 효과 (오늘의 도전은 모두 같은 조건이라 도구를 쓰지 않는다)
     this.gear = this.run.kind === 'daily' ? equippedEffects.empty() : equippedEffects();
-    this.hat = wornHat(); // 🎨 요리 위에 씌우는 모자
+    // 🎨 꾸미기: 모자, 바닥, 레일, 던지기 꼬리, 배부름 효과
+    this.hat = worn('hat')?.emoji ?? null;
+    this.trail = worn('trail')?.emojis ?? null;
+    this.trailCount = 0;
+    this.feedPop = worn('feed')?.emojis ?? null;
+    const rail = worn('rail')?.rail;
+    this.railColors = rail ? { rail: rail[0], stripe: rail[1], slat: rail[2] } : { rail: COLORS.rail, stripe: COLORS.railStripe, slat: COLORS.railSlat };
     this.gold = START_GOLD + shopBonus('startGold') + (this.mod.startGold ?? 0) + this.gear.startGold;
     this.railLimit = this.run.railLimit + shopBonus('railCapacity') + (this.mod.railLimit ?? 0);
     this.peakMonsters = 0; // 이번 판에 레일에 가장 많이 쌓였던 손님 수 (별 계산)
@@ -473,6 +479,7 @@ export default class GameScene extends Phaser.Scene {
     this.monsters = this.monsters.filter((o) => o !== monster);
     if (monster.reward > 0) this.floatText(monster.x, monster.y - 30, `+${monster.reward}`, COLORS.gold);
     this.reaction(monster, '😋', 1);
+    if (this.feedPop) this.popEmojis(monster.x, monster.y, this.feedPop, monster.isBoss ? 10 : 4);
     sfx.serve();
     burst(this, this.effectLayer, monster.x, monster.y, MONSTER_COLORS[monster.typeKey] ?? [0xfff8ec], monster.isBoss ? 30 : 7, monster.isBoss ? 2 : 1);
 
@@ -498,6 +505,44 @@ export default class GameScene extends Phaser.Scene {
       duration: 260,
       ease: 'Quad.Out',
       onComplete: () => monster.destroy(),
+    });
+  }
+
+  // 🎨 배부름 효과: 이모지가 사방으로 튀었다 사라진다
+  popEmojis(x, y, emojis, count) {
+    for (let i = 0; i < count; i++) {
+      const e = this.add.text(x, y, emojis[i % emojis.length], { fontFamily: EMOJI_FONT, fontSize: '26px' }).setOrigin(0.5);
+      this.effectLayer.add(e);
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Phaser.Math.Between(40, 80);
+      this.tweens.add({
+        targets: e,
+        x: x + Math.cos(angle) * dist,
+        y: y + Math.sin(angle) * dist - 20,
+        scale: 1.3,
+        alpha: 0,
+        duration: 600,
+        ease: 'Quad.Out',
+        onComplete: () => e.destroy(),
+      });
+    }
+  }
+
+  // 🎨 던지기 꼬리: 날아가는 요리 뒤에 작은 이모지를 남긴다 (너무 많아지지 않게 수를 제한)
+  dropTrail(x, y) {
+    if (!this.trail || (this.trailCount ?? 0) > 50) return;
+    this.trailCount = (this.trailCount ?? 0) + 1;
+    const e = this.add.text(x, y, this.trail[Math.floor(Math.random() * this.trail.length)], { fontFamily: EMOJI_FONT, fontSize: '18px' }).setOrigin(0.5);
+    this.effectLayer.add(e);
+    this.tweens.add({
+      targets: e,
+      alpha: 0,
+      scale: 0.4,
+      duration: 350,
+      onComplete: () => {
+        e.destroy();
+        this.trailCount -= 1;
+      },
     });
   }
 
@@ -1923,12 +1968,12 @@ export default class GameScene extends Phaser.Scene {
         const y = this.boardY + row * TILE;
 
         if (this.isRail(col, row)) {
-          g.fillStyle(COLORS.rail, 1);
+          g.fillStyle(this.railColors.rail, 1);
           g.fillRect(x, y, TILE, TILE);
-          g.fillStyle(COLORS.railStripe, 1);
+          g.fillStyle(this.railColors.stripe, 1);
           g.fillRect(x + 6, y + 6, TILE - 12, TILE - 12);
           // 컨베이어 마디: 주문이 가는 방향과 수직으로 놓인 줄무늬
-          g.fillStyle(COLORS.railSlat, 1);
+          g.fillStyle(this.railColors.slat, 1);
           const horizontal = row === 0 || row === BOARD_ROWS - 1;
           for (let k = 0; k < 4; k++) {
             if (horizontal) g.fillRect(x + 10 + k * 26, y + 10, 8, TILE - 20);
@@ -1937,7 +1982,7 @@ export default class GameScene extends Phaser.Scene {
           this.drawArrow(g, x + TILE / 2, y + TILE / 2, this.railDirection(col, row));
         } else {
           const checker = (col + row) % 2 === 0;
-          g.fillStyle((wornFloor() ?? this.run.floor)[checker ? 0 : 1], 1);
+          g.fillStyle((worn('floor')?.colors ?? this.run.floor)[checker ? 0 : 1], 1);
           g.fillRect(x, y, TILE, TILE);
         }
       }

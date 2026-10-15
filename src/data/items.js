@@ -4,9 +4,14 @@
 //   레벨이 1 오를 때마다 효과가 25%씩 커진다.
 //   effect 종류: speed(모든 칼질 속도 +비율), lineSpeed{줄}, damage(모든 요리 양 +비율), lineDamage{줄},
 //                startGold(시작 골드), hand(손 힘 최대), summonDiscount(뽑기 비용 -), tips(판 끝 팁 +비율)
-// 🎨 꾸미기: 요리 위에 쓰는 모자, 판 바닥 색. 강해지지는 않고 모양만 바뀐다.
+// 🎨 꾸미기: data/cosmetics.js
+// 상자는 팁이나 🎟️ 상자 쿠폰(주문서 보상)으로 연다. 하루 한 번 🆓 무료 상자가 있다.
+// 천장: 전설이 정해진 횟수 안에 안 나오면 다음 상자는 무조건 전설.
 
 import { getSave, writeSave } from '../save.js';
+import { COSMETICS, FRAGMENTS_FOR_DUPLICATE, FRAGMENT_PRICE, cosmeticById, isAvailable } from './cosmetics.js';
+import { currentEvent } from './events.js';
+import { todayKey } from './daily.js';
 
 export const ITEM_TIERS = {
   1: { name: '일반', color: 0xb8b8b8 },
@@ -44,33 +49,18 @@ export const TOOLS = [
   { id: 'star_coat', slot: 'coat', tier: 4, emoji: '🌟', name: '전설의 별 가운', effect: { startGold: 50, summonDiscount: 2, tips: 0.1 } },
 ];
 
-// 🎨 꾸미기
-export const HATS = [
-  { id: 'ribbon', tier: 1, emoji: '🎀', name: '리본' },
-  { id: 'cap', tier: 1, emoji: '🧢', name: '야구 모자' },
-  { id: 'straw', tier: 2, emoji: '👒', name: '밀짚모자' },
-  { id: 'silk', tier: 3, emoji: '🎩', name: '실크햇' },
-  { id: 'crown', tier: 4, emoji: '👑', name: '왕관' },
-];
-
-export const FLOORS = [
-  { id: 'mint', tier: 1, emoji: '🍃', name: '민트 체크', colors: [0xd9f2e6, 0xc2e6d4] },
-  { id: 'strawberry', tier: 1, emoji: '🍓', name: '딸기 우유', colors: [0xfde2ea, 0xf6c9d7] },
-  { id: 'night', tier: 2, emoji: '🌙', name: '밤하늘', colors: [0x4a4f80, 0x3c406c] },
-  { id: 'sakura', tier: 3, emoji: '🌸', name: '벚꽃', colors: [0xffe4f0, 0xf6c2da] },
-  { id: 'gold', tier: 4, emoji: '✨', name: '황금 주방', colors: [0xffe9a8, 0xf5d77a] },
-];
-
 // 🎁 상자
 export const BOXES = [
-  { id: 'tool', emoji: '🎁', name: '도구 상자', desc: '칼·냄비·옷 중 하나. 같은 도구면 레벨 업!', cost: 100, color: 0xe85d3a },
+  { id: 'tool', emoji: '🎁', name: '도구 상자', desc: '칼·냄비·옷 도구. 같은 도구면 레벨 업!', cost: 100, color: 0xe85d3a, pity: 50 },
+  { id: 'style', emoji: '🎨', name: '꾸미기 상자', desc: '모자·바닥·레일·꼬리·배부름 효과. 겹치면 ✨조각', cost: 80, color: 0x8e4fc0, pity: 40 },
   { id: 'recipe', emoji: '📖', name: '레시피 상자', desc: '내 레시피 줄 하나에 경험치 (가끔 대박)', cost: 60, color: 0x3f9a4a },
-  { id: 'style', emoji: '🎨', name: '꾸미기 상자', desc: '새 모자나 판 바닥 (못 가진 것만 나와요)', cost: 80, color: 0x8e4fc0 },
+  { id: 'golden', emoji: '🌟', name: '황금 꾸미기 상자', desc: '영웅·전설 꾸미기만! (쿠폰으로는 못 열어요)', cost: 1500, color: 0xc99a2e, noCoupon: true },
 ];
 
 // 상자에서 나오는 등급 확률
 export const TOOL_ODDS = { 1: 70, 2: 22, 3: 7, 4: 1 };
-const STYLE_ODDS = { 1: 60, 2: 28, 3: 10, 4: 2 };
+export const STYLE_ODDS = { 1: 60, 2: 28, 3: 10, 4: 2 };
+const GOLDEN_ODDS = { 3: 70, 4: 30 };
 // 레시피 상자 경험치: 75% 작게, 20% 중간, 5% 대박
 const RECIPE_XP = [
   { xp: 30, w: 75 },
@@ -80,10 +70,6 @@ const RECIPE_XP = [
 
 export function toolById(id) {
   return TOOLS.find((t) => t.id === id);
-}
-
-export function cosmeticById(id) {
-  return HATS.find((h) => h.id === id) ?? FLOORS.find((f) => f.id === id);
 }
 
 // 레벨이 반영된 도구 효과 (레벨 1마다 25%씩 커진다)
@@ -141,12 +127,10 @@ export function equippedEffects() {
 
 equippedEffects.empty = noEffects; // 도구를 쓰지 않는 판 (오늘의 도전)
 
-// 지금 쓰고 있는 모자 이모지, 판 바닥 색 (없으면 null)
-export function wornHat() {
-  return HATS.find((h) => h.id === getSave().wear?.hat)?.emoji ?? null;
-}
-export function wornFloor() {
-  return FLOORS.find((f) => f.id === getSave().wear?.floor)?.colors ?? null;
+// 지금 쓰고 있는 꾸미기 (칸 이름 → 꾸미기, 안 쓰면 null)
+export function worn(slot) {
+  const item = cosmeticById(getSave().wear?.[slot]);
+  return item && getSave().cosmetics?.includes(item.id) ? item : null;
 }
 
 function pickWeighted(entries, rnd = Math.random) {
@@ -159,16 +143,41 @@ function pickWeighted(entries, rnd = Math.random) {
   return entries[entries.length - 1];
 }
 
-// 상자를 연다. 팁이 모자라면 null. 결과: { box, kind, item?, tier, level?, isNew?, line?, xp?, big?, refund? }
-export function openBox(boxId, rnd = Math.random) {
+// 🆓 오늘 무료 상자를 열 수 있는지 (하루 한 번, 한국 시간)
+export function freeBoxReady() {
+  return getSave().freeBox !== todayKey();
+}
+
+// 등급 뽑기 (천장: pity번째까지 전설이 안 나왔으면 전설)
+function rollTier(odds, box, save, rnd) {
+  save.pity ??= {};
+  const count = (save.pity[box.id] ?? 0) + 1;
+  let tier = Number(pickWeighted(Object.entries(odds).map(([t, w]) => ({ t, w })), rnd).t);
+  if (box.pity && count >= box.pity) tier = 4;
+  save.pity[box.id] = tier === 4 ? 0 : count;
+  return tier;
+}
+
+// 상자를 연다. pay: 'tips'(팁) / 'coupon'(🎟️ 쿠폰) / 'free'(🆓 오늘 무료). 못 열면 null.
+// 결과: { box, kind, item?, tier, level?, isNew?, fragments?, line?, xp?, big? }
+export function openBox(boxId, pay = 'tips', rnd = Math.random) {
   const box = BOXES.find((b) => b.id === boxId);
   const save = getSave();
-  if (!box || save.tips < box.cost) return null;
-  save.tips -= box.cost;
+  if (!box) return null;
+  if (pay === 'tips') {
+    if (save.tips < box.cost) return null;
+    save.tips -= box.cost;
+  } else if (pay === 'coupon') {
+    if (box.noCoupon || (save.coupons ?? 0) <= 0) return null;
+    save.coupons -= 1;
+  } else if (pay === 'free') {
+    if (!freeBoxReady() || box.noCoupon) return null;
+    save.freeBox = todayKey();
+  }
   let result;
 
   if (box.id === 'tool') {
-    const tier = Number(pickWeighted(Object.entries(TOOL_ODDS).map(([t, w]) => ({ t, w })), rnd).t);
+    const tier = rollTier(TOOL_ODDS, box, save, rnd);
     const pool = TOOLS.filter((t) => t.tier === tier);
     const tool = pool[Math.floor(rnd() * pool.length)];
     save.tools ??= {};
@@ -188,17 +197,37 @@ export function openBox(boxId, rnd = Math.random) {
     save.lineXp[line] = (save.lineXp[line] ?? 0) + roll.xp;
     result = { kind: 'recipe', line, xp: roll.xp, big: Boolean(roll.big), tier: roll.big ? 4 : roll.xp > 30 ? 2 : 1 };
   } else {
+    // 🎨 꾸미기: 등급을 먼저 뽑고, 그 등급에서 지금 얻을 수 있는 것 중 하나 (가진 것도 나온다 → 조각)
+    const eventId = currentEvent().id;
+    const tier = rollTier(box.id === 'golden' ? GOLDEN_ODDS : STYLE_ODDS, box, save, rnd);
+    let pool = COSMETICS.filter((c) => c.tier === tier && isAvailable(c, eventId));
+    // 못 가진 것이 먼저 나오기 쉽게 (못 가진 것 3배)
     save.cosmetics ??= [];
-    const left = [...HATS, ...FLOORS].filter((c) => !save.cosmetics.includes(c.id));
-    if (left.length === 0) {
-      save.tips += box.cost; // 다 모았으면 돌려준다
-      result = { kind: 'style', refund: box.cost, tier: 1 };
-    } else {
-      const item = pickWeighted(left.map((c) => ({ ...c, w: STYLE_ODDS[c.tier] })), rnd);
-      save.cosmetics.push(item.id);
-      result = { kind: 'style', item: cosmeticById(item.id), tier: item.tier, isNew: true, hat: HATS.some((h) => h.id === item.id) };
+    const weighted = pool.map((c) => ({ c, w: save.cosmetics.includes(c.id) ? 1 : 3 }));
+    const item = pickWeighted(weighted, rnd).c;
+    const isNew = !save.cosmetics.includes(item.id);
+    let fragments = 0;
+    if (isNew) save.cosmetics.push(item.id);
+    else {
+      fragments = FRAGMENTS_FOR_DUPLICATE[item.tier];
+      save.fragments = (save.fragments ?? 0) + fragments;
     }
+    result = { kind: 'style', item, tier, isNew, fragments };
   }
   writeSave();
   return { box, ...result };
+}
+
+// ✨ 조각으로 꾸미기 사기. 성공하면 true
+export function buyWithFragments(id) {
+  const save = getSave();
+  const item = cosmeticById(id);
+  if (!item || save.cosmetics?.includes(id) || !isAvailable(item, currentEvent().id)) return false;
+  const price = FRAGMENT_PRICE[item.tier];
+  if ((save.fragments ?? 0) < price) return false;
+  save.fragments -= price;
+  save.cosmetics ??= [];
+  save.cosmetics.push(id);
+  writeSave();
+  return true;
 }

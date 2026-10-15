@@ -1,15 +1,15 @@
 import { getSave, writeSave } from '../save.js';
 import { todayKey } from './daily.js';
 
-// 📋 오늘의 주문서: 매일(한국 시간) 퀘스트 3개. 다 하면 팁을 받는다.
+// 📋 오늘의 주문서: 매일(한국 시간) 퀘스트 3개. 하나 할 때마다 🎟️ 상자 쿠폰을 받는다.
 // 같은 날에는 모든 플레이어가 같은 퀘스트를 받는다.
 //
 // event: 게임에서 이 일이 일어날 때마다 진행된다 (GameScene.quest(event, 양))
 // max: true면 "한 번에 얼마나"를 센다 (예: 한 판에 몇 웨이브까지)
 
 export const QUEST_COUNT = 3;
-export const QUEST_REWARD = 50; // 퀘스트 하나 팁
-export const QUEST_BONUS = 100; // 3개를 다 하면 추가 팁
+export const QUEST_REWARD = 1; // 퀘스트 하나에 🎟️ 상자 쿠폰
+export const QUEST_BONUS = 2; // 3개를 다 하면 쿠폰 더
 
 export const QUESTS = [
   { id: 'summon', emoji: '🎲', text: '뽑기 40번 하기', event: 'summon', target: 40 },
@@ -74,13 +74,13 @@ export function addQuestProgress(event, amount = 1) {
   return finished;
 }
 
-// 보상 받기. 받은 팁을 돌려준다 (못 받으면 0)
+// 보상 받기. 받은 쿠폰 수를 돌려준다 (못 받으면 0)
 export function claimQuest(id) {
   const q = todaysQuests().find((x) => x.id === id);
   if (!q || !q.done || q.claimed) return 0;
   const save = getSave();
   record().claimed.push(id);
-  save.tips += QUEST_REWARD;
+  save.coupons = (save.coupons ?? 0) + QUEST_REWARD;
   writeSave();
   return QUEST_REWARD;
 }
@@ -93,7 +93,8 @@ export function canClaimBonus() {
 export function claimBonus() {
   if (!canClaimBonus()) return 0;
   record().bonus = true;
-  getSave().tips += QUEST_BONUS;
+  const save = getSave();
+  save.coupons = (save.coupons ?? 0) + QUEST_BONUS;
   writeSave();
   return QUEST_BONUS;
 }

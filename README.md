@@ -47,7 +47,8 @@ src/
     daily.js          🏆 오늘의 도전 (같은 운, 하루 3번)
     quests.js         📋 오늘의 주문서
     events.js         🎉 2주 이벤트
-    items.js          🎁 상자, 🔪 주방 도구, 🎨 꾸미기
+    items.js          🎁 상자(천장, 쿠폰, 무료 상자), 🔪 주방 도구
+    cosmetics.js      🎨 꾸미기 42개와 세트, 조각
     rules.js          특별 규칙 합치기
     kitchens.js       주방 사고(불, 정전, 빠른 레일) 목록
   objects/
