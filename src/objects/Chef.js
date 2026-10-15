@@ -60,8 +60,9 @@ export default class Chef extends Phaser.GameObjects.Container {
       .setVisible(data.method !== 'buff');
     this.dots = scene.add.graphics();
     const parts = [this.pad, shadow, this.sprite, this.knife, this.dots];
-    // 🎅 크리스마스에는 산타 모자를 씌운다
+    // 🎅 크리스마스에는 산타 모자, 평소에는 🎨 꾸미기에서 고른 모자를 씌운다
     if (isChristmas()) parts.push(scene.add.image(-20, -42, 'santa_hat').setScale(4).setAngle(-15));
+    else if (scene.hat) parts.push(scene.add.text(-6, -40, scene.hat, { fontFamily: EMOJI_FONT, fontSize: '30px' }).setOrigin(0.5).setAngle(-12));
     this.body_ = scene.add.container(0, 0, parts);
 
     this.add(this.body_);

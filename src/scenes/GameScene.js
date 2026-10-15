@@ -31,6 +31,7 @@ import { mergeRules } from '../data/rules.js';
 import { cardsForDeck, emptyCardFx, addCardFx } from '../data/cards.js';
 import { stageRun } from '../data/runs.js';
 import { EVENT_BONUS } from '../data/events.js';
+import { equippedEffects, wornHat, wornFloor } from '../data/items.js';
 import { TOWNS, STAGES_PER_TOWN, STAR_LINES, stageStars, townsOpen, FEATURE_TOWN } from '../data/towns.js';
 import { addQuestProgress } from '../data/quests.js';
 
@@ -88,7 +89,10 @@ export default class GameScene extends Phaser.Scene {
     this.fires = []; // 불난 중식당: 불붙은 칸들 { slot, timeLeft, icon }
     this.blackout = null; // 정전된 레스토랑: { slots, timeLeft }
     // 가게 강화(영구 성장) 효과를 이번 판에 적용
-    this.gold = START_GOLD + shopBonus('startGold') + (this.mod.startGold ?? 0);
+    // 🔪 장착한 주방 도구 효과 (오늘의 도전은 모두 같은 조건이라 도구를 쓰지 않는다)
+    this.gear = this.run.kind === 'daily' ? equippedEffects.empty() : equippedEffects();
+    this.hat = wornHat(); // 🎨 요리 위에 씌우는 모자
+    this.gold = START_GOLD + shopBonus('startGold') + (this.mod.startGold ?? 0) + this.gear.startGold;
     this.railLimit = this.run.railLimit + shopBonus('railCapacity') + (this.mod.railLimit ?? 0);
     this.peakMonsters = 0; // 이번 판에 레일에 가장 많이 쌓였던 손님 수 (별 계산)
     this.bossPatience = BOSS_PATIENCE + shopBonus('patience') + (this.mod.patience ?? 0);
@@ -96,7 +100,7 @@ export default class GameScene extends Phaser.Scene {
     this.bossesDefeated = 0; // 이번 판에 만족시킨 VIP 손님 수 (= 별)
     this.summonCount = 0; // 지금까지 뽑은 횟수 (뽑기 비용 계산용)
     this.deck = this.run.deck ?? STARTER_LINES; // 이번 판에 나오는 레시피 4줄
-    this.hand = HAND_POWER_MAX; // 🔪 손 힘: 요리를 톡 눌러 칼질을 도울 때 하나씩 쓴다
+    this.hand = HAND_POWER_MAX + this.gear.hand; // 🔪 손 힘: 요리를 톡 눌러 칼질을 도울 때 하나씩 쓴다
     this.comboCharge = new Map(); // 붙어 있는 두 요리의 합작 게이지 { '칸-칸': 찬 양 }
     this.links = []; // 지금 붙어 있는 합작 요리 연결
     // 이번 판에 쓸 수 있는 기능 (동네 지도에서 하나씩 열린다)
@@ -798,7 +802,8 @@ export default class GameScene extends Phaser.Scene {
   powerMultiplier(stats) {
     const daily = this.mod.lineDamage?.[stats.method] ?? 1; // 🍽️ 오늘의 도전: 줄별 요리 양
     const card = 1 + (this.cardFx.damage ?? 0) + (this.cardFx.lineDamage[stats.method] ?? 0); // 📜 레시피 카드
-    return (1 + this.levelOf(stats.method) * LINE_DAMAGE_PER_LEVEL) * daily * card;
+    const gear = 1 + this.gear.damage + (this.gear.lineDamage[stats.method] ?? 0); // 🍳 냄비
+    return (1 + this.levelOf(stats.method) * LINE_DAMAGE_PER_LEVEL) * daily * card * gear;
   }
 
   // 레시피 줄 레벨 (판을 시작할 때 정해진다). 요리의 신 같은 특별 요리는 덱 줄 레벨의 평균
@@ -814,7 +819,7 @@ export default class GameScene extends Phaser.Scene {
   // 뽑기 비용: 기본 비용에서 가게 강화(단골 시장)만큼 할인
   currentSummonCost() {
     if (this.cardFx.freeSummons > 0) return 0; // 🎲 시장 쿠폰
-    const cost = summonCost(this.summonCount) - shopBonus('summonDiscount');
+    const cost = summonCost(this.summonCount) - shopBonus('summonDiscount') - this.gear.summonDiscount;
     return Math.max(1, Math.round(cost * (this.mod.summonCost ?? 1))); // 🍽️ 할인 데이
   }
 
@@ -829,7 +834,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 손 힘 최대 (💪 카드면 더)
   handMax() {
-    return HAND_POWER_MAX + (this.cardFx.hand ?? 0);
+    return HAND_POWER_MAX + (this.cardFx.hand ?? 0) + this.gear.hand;
   }
 
   // 뽑기 등급 확률 (🍀 행운의 앞치마 카드면 희귀·영웅이 더 잘 나온다)
@@ -1014,7 +1019,8 @@ export default class GameScene extends Phaser.Scene {
         if (other.stats.cheer) cheer = Math.max(cheer, other.stats.cheer.attackSpeed);
       }
       const card = (this.cardFx.speed ?? 0) + (this.cardFx.lineSpeed[chef.stats.method] ?? 0); // 📜 카드
-      chef.attackSpeed = 1 + lead + cheer + card;
+      const gear = this.gear.speed + (this.gear.lineSpeed[chef.stats.method] ?? 0); // 🔪 칼
+      chef.attackSpeed = 1 + lead + cheer + card + gear;
     }
     this.updateSets();
   }
@@ -1510,7 +1516,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 팁 배율: 판 종류 보너스 × 특별 규칙
   tipRate() {
-    return this.run.tipBonus * (this.mod.tips ?? 1);
+    return this.run.tipBonus * (this.mod.tips ?? 1) * (1 + this.gear.tips);
   }
 
   // 판 끝 보상: 별과 팁을 계산해서 저장한다
@@ -1931,7 +1937,7 @@ export default class GameScene extends Phaser.Scene {
           this.drawArrow(g, x + TILE / 2, y + TILE / 2, this.railDirection(col, row));
         } else {
           const checker = (col + row) % 2 === 0;
-          g.fillStyle(this.run.floor[checker ? 0 : 1], 1);
+          g.fillStyle((wornFloor() ?? this.run.floor)[checker ? 0 : 1], 1);
           g.fillRect(x, y, TILE, TILE);
         }
       }

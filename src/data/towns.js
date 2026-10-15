@@ -42,7 +42,7 @@ export const TOWNS = [
     waves: 10,
     boss: 'pig',
     bossHp: 1.47,
-    opens: '🍱 합작 요리, 🏪 가게',
+    opens: '🍱 합작 요리, 🏆 오늘의 도전',
   },
   {
     id: 'forest',
@@ -189,7 +189,7 @@ export function townStars(town) {
 export const FEATURE_TOWN = {
   daily: 2, // 🏆 오늘의 도전, 📋 주문서, 랭킹 (동네 1을 깨면)
   combos: 2, // 🍱 합작 요리
-  shop: 2, // 🏪 가게
+  shop: 1, // 🏪 가게 (처음부터)
   cards: 3, // 📜 레시피 카드
   deck: 3, // 덱 고르기 (새 줄이 생기면)
   mythic: 4, // 🍽️ 풀코스 요리

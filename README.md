@@ -47,6 +47,7 @@ src/
     daily.js          🏆 오늘의 도전 (같은 운, 하루 3번)
     quests.js         📋 오늘의 주문서
     events.js         🎉 2주 이벤트
+    items.js          🎁 상자, 🔪 주방 도구, 🎨 꾸미기
     rules.js          특별 규칙 합치기
     kitchens.js       주방 사고(불, 정전, 빠른 레일) 목록
   objects/
@@ -63,7 +64,7 @@ src/
     MapScene.js       🗺️ 동네 지도
     DeckScene.js      🃏 덱 고르기
     GameScene.js      게임 화면 (웨이브, 뽑기, 칼질, 던지기, 합치기, 튜토리얼, 승패)
-    ShopScene.js      🏪 가게 강화
+    ShopScene.js      🏪 가게 (상자, 도구, 꾸미기, 강화)
     CodexScene.js     📖 레시피 (줄 레벨, 만난 요리)
     RankingScene.js   🏆 랭킹 (오늘의 도전, 무한 모드)
 ```
