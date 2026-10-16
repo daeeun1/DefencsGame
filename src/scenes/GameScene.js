@@ -131,6 +131,9 @@ export default class GameScene extends Phaser.Scene {
       const seed = this.daily.seed;
       this.rng = { summon: seededRandom(seed + 1), wave: Math.random, cards: seededRandom(seed + 3), merge: seededRandom(seed + 4) };
     }
+    // 🌱 첫 판: 처음 1~2분 동안 운을 조금 도와준다 (같은 재료가 연달아 나와 1분 안에 영웅까지)
+    this.firstRun = this.run.kind === 'journey' && !resume && (this.run.startTown ?? 0) === 0 && !(getSave().seen ?? []).includes('tutorial');
+    this.firstFed = false;
     this.time.paused = false;
     this.gameSpeed = this.registry.get('gameSpeed') ?? 1; // 다시 하기를 눌러도 배속 유지
 
@@ -496,6 +499,12 @@ export default class GameScene extends Phaser.Scene {
     this.monsters = this.monsters.filter((o) => o !== monster);
     if (monster.reward > 0) this.floatText(monster.x, monster.y - 30, `+${monster.reward}`, COLORS.gold);
     this.reaction(monster, '😋', 1);
+    if (this.firstRun && !this.firstFed) {
+      // 🌱 첫 손님 배부름: 크게 알려 준다
+      this.firstFed = true;
+      this.floatText(monster.x, monster.y - 80, '😋 첫 손님 배부름!', COLORS.gold, 34);
+      burst(this, this.effectLayer, monster.x, monster.y, [0xffd54f, 0xfff8ec, 0xff8fb1], 24, 1.5);
+    }
     if (this.feedPop) this.popEmojis(monster.x, monster.y, this.feedPop, monster.isBoss ? 10 : 4);
     sfx.serve();
     burst(this, this.effectLayer, monster.x, monster.y, MONSTER_COLORS[monster.typeKey] ?? [0xfff8ec], monster.isBoss ? 30 : 7, monster.isBoss ? 2 : 1);
@@ -707,8 +716,13 @@ export default class GameScene extends Phaser.Scene {
     if (this.freeSummons > 0) this.freeSummons -= 1; // 🎲 무료 뽑기
 
     const rnd = this.rng.summon;
-    const tier = Number(pickWeighted(this.summonOdds(), rnd));
+    let tier = Number(pickWeighted(this.summonOdds(), rnd));
     let data = pick(chefsOfTier(tier, this.deck), rnd);
+    // 🌱 첫 판의 첫 4번은 같은 재료: 겹치고, 또 겹쳐서 영웅까지
+    if (this.firstRun && this.summonCount <= 4) {
+      tier = 1;
+      data = chefsOfTier(1, this.deck)[0];
+    }
     if (rnd() < DISHWASHER_CHANCE) data = chefById('dishwasher'); // 🥚 0.1%
     const slot = pick(empty, rnd);
 
@@ -917,6 +931,8 @@ export default class GameScene extends Phaser.Scene {
 
   // 뽑기 등급 확률 (🍀 행운의 앞치마 카드면 희귀·영웅이 더 잘 나온다)
   summonOdds() {
+    // 🌱 첫 판 처음 5웨이브는 희귀·영웅이 잘 나온다 (반짝이는 걸 많이 보게)
+    if (this.firstRun && this.wave <= 5) return { 1: 78, 2: 19, 3: 3 };
     const odds = { ...(this.mod.summonOdds ?? SUMMON_ODDS) };
     return odds;
   }
@@ -1285,7 +1301,14 @@ export default class GameScene extends Phaser.Scene {
     const color = colorToHex(TIERS[data.tier].color);
     this.floatText(slot.x, slot.y - 50, data.name, color, 24);
     this.log(`[합성] ${TIERS[data.tier].name} ${data.emoji} ${data.name} 완성!`, color);
-    if (surprise) this.showBanner(`🛎️ 깜짝 등장!\n${data.name}`, color, 44);
+    if (this.firstRun && data.tier === 3 && !this.firstHero) {
+      // 🌱 첫 영웅: 크게 축하
+      this.firstHero = true;
+      confetti(this, GAME_WIDTH, this.screenHeight);
+      flash(this, 0xffd54f);
+      this.showBanner(`🎉 영웅 요리 탄생!\n${data.emoji} ${data.name}`, color, 48);
+    } else if (this.firstRun && data.tier === 2 && this.summonCount <= 4) this.showBanner(`✨ 희귀! ${data.emoji} ${data.name}`, color, 44);
+    else if (surprise) this.showBanner(`🛎️ 깜짝 등장!\n${data.name}`, color, 44);
     else if (data.tier >= 3) this.showBanner(`🔀 ${TIERS[data.tier].name}! ${data.emoji} ${data.name}`, color, 44);
     this.updateHud();
   }
@@ -1646,15 +1669,13 @@ export default class GameScene extends Phaser.Scene {
   // 튜토리얼 단계마다: 안내 글, 손가락 위치, 다음으로 넘어가는 일(event)과 횟수
   tutorialSteps() {
     return [
-      { text: '🎲 재료 뽑기를 눌러 보세요!\n뽑은 재료가 요리가 되어 손님에게 던져요', event: 'summon', times: 3, point: () => this.summonButton },
-      {
-        text: '같은 재료 두 개를 끌어서 겹치면\n다음 요리로 합쳐져요! (자동 합치기도 OK)',
-        event: 'merge',
-        times: 1,
-        point: () => this.findPair() ?? this.mergeButton,
-      },
-      { text: '요리를 톡! 누르면 칼질을 도와줘요 🔪\n(너무 많이 누르면 손이 아파서 잠깐 쉬어요)', event: 'chop', times: 3, point: () => this.chefs[0] },
-      { text: '😋 손님 배를 꽉 채우면 팁을 남겨요\n손님이 너무 많이 쌓이면 식당이 망해요!', event: null, times: 0, point: () => null },
+      { text: '🎲 재료 뽑기를 2번 눌러 보세요!', event: 'summon', times: 2, point: () => this.summonButton },
+      { text: '똑같은 재료다! 👆 끌어서 겹쳐 봐요', event: 'merge', times: 1, point: () => this.findPair() ?? this.mergeButton },
+      { text: '✨ 희귀 요리! 한 번 더 뽑아 볼까요? (2번)', event: 'summon', times: 2, point: () => this.summonButton },
+      { text: '또 똑같은 재료! 겹쳐요', event: 'merge', times: 1, point: () => this.findPair() ?? this.mergeButton },
+      { text: '희귀 두 개를 겹치면…?', event: 'merge', times: 1, point: () => this.findPair() ?? this.mergeButton },
+      { text: '요리를 톡톡 누르면 칼질을 도와줘요 🔪\n(빨리 던져요!)', event: 'chop', times: 3, point: () => this.chefs.find((c) => c.stats.tier === 3) ?? this.chefs[0] },
+      { text: '🎯 목표: 웨이브 10의 보스를 막아라!\n손님이 40명 쌓이면 식당이 망해요', event: null, times: 0, point: () => null },
     ];
   }
 
@@ -1674,8 +1695,9 @@ export default class GameScene extends Phaser.Scene {
       this.tutorial = null;
       return;
     }
+    // 안내 상자는 판 맨 아래 레일 줄에 (요리를 가리지 않게)
     tut.box = this.add
-      .text(GAME_WIDTH / 2, this.boardY + 175, step.text, {
+      .text(GAME_WIDTH / 2, this.boardY + (BOARD_ROWS - 0.5) * TILE, step.text, {
         fontFamily: FONT,
         fontSize: '25px',
         fontStyle: 'bold',

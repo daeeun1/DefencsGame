@@ -69,7 +69,10 @@ export default class TitleScene extends Phaser.Scene {
     const label = snap
       ? `▶ 이어 하기 웨이브 ${snap.wave}\n${TOWNS[townOfWave(snap.wave)].emoji} ${TOWNS[townOfWave(snap.wave)].name}`
       : `🗺️ 여정 출발\n${best > 0 ? `🏁 최고 웨이브 ${best}` : '배고픈 손님을 막아라!'}`;
-    createButton(this, centerX, top + 730, 560, 140, label, () => this.scene.start('Journey'), { fontSize: 40 });
+    // 🌱 처음 온 사람은 지도를 건너뛰고 바로 첫 판으로 (첫 1분 안에 요리를 던지게)
+    const fresh = !snap && !(save.runs > 0) && best === 0;
+    const start = fresh ? () => this.scene.start('Game', { startTown: 0 }) : () => this.scene.start('Journey');
+    createButton(this, centerX, top + 730, 560, 140, fresh ? '▶ 바로 시작!\n배고픈 손님을 막아라!' : label, start, { fontSize: 40 });
 
     // 🏆 오늘의 도전, 📋 주문서: 동네 1을 깨면 열린다
     const dailyOpen = hasFeature('daily');
