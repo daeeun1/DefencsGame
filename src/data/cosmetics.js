@@ -11,18 +11,18 @@
 
 export const COSMETIC_SLOTS = [
   { id: 'hat', emoji: '🎩', name: '모자' },
-  { id: 'floor', emoji: '🟫', name: '바닥' },
+  { id: 'floor', emoji: '⬛', name: '바닥' },
   { id: 'rail', emoji: '🛤️', name: '레일' },
   { id: 'trail', emoji: '✨', name: '꼬리' },
   { id: 'feed', emoji: '😋', name: '배부름' },
 ];
 
 export const THEMES = [
-  { id: 'basic', emoji: '🧺', name: '기본', title: null },
+  { id: 'basic', emoji: '🛒', name: '기본', title: null },
   { id: 'strawberry', emoji: '🍓', name: '딸기', title: '🍓 딸기 사장님' },
   { id: 'ocean', emoji: '🌊', name: '바다', title: '🌊 바다 사장님' },
   { id: 'sakura', emoji: '🌸', name: '벚꽃', title: '🌸 벚꽃 사장님' },
-  { id: 'space', emoji: '🪐', name: '우주', title: '🪐 우주 사장님' },
+  { id: 'space', emoji: '🚀', name: '우주', title: '🚀 우주 사장님' },
   { id: 'halloween', emoji: '🎃', name: '할로윈', title: '🎃 할로윈 사장님', event: 'halloween' },
   { id: 'christmas', emoji: '🎄', name: '크리스마스', title: '🎄 크리스마스 사장님', event: 'christmas' },
   { id: 'golden', emoji: '👑', name: '황금', title: '👑 황금 사장님' },
@@ -31,12 +31,12 @@ export const THEMES = [
 const item = (id, slot, theme, tier, name, emoji, extra = {}) => ({ id, slot, theme, tier, name, emoji, ...extra });
 
 export const COSMETICS = [
-  // 🧺 기본 (테마 없음)
+  // 🛒 기본 (테마 없음)
   item('cap', 'hat', 'basic', 1, '야구 모자', '🧢'),
   item('grad', 'hat', 'basic', 1, '학사모', '🎓'),
   item('mint', 'floor', 'basic', 1, '민트 체크', '🍃', { colors: [0xd9f2e6, 0xc2e6d4] }),
   item('lemon', 'floor', 'basic', 1, '레몬 체크', '🍋', { colors: [0xfff5c2, 0xf5e79e] }),
-  item('wood_rail', 'rail', 'basic', 1, '나무 레일', '🪵', { rail: [0x8a5a34, 0xa06c42, 0x7a4e2c] }),
+  item('wood_rail', 'rail', 'basic', 1, '나무 레일', '🌲', { rail: [0x8a5a34, 0xa06c42, 0x7a4e2c] }),
   item('dust', 'trail', 'basic', 1, '흙먼지', '💨', { emojis: ['💨'] }),
   item('yum', 'feed', 'basic', 1, '냠냠', '😋', { emojis: ['😋', '👍'] }),
   // 🍓 딸기
@@ -57,12 +57,12 @@ export const COSMETICS = [
   item('pink_rail', 'rail', 'sakura', 2, '분홍 나무 레일', '🌷', { rail: [0xc77d9e, 0xdb9ab6, 0xb56c8c] }),
   item('petal_trail', 'trail', 'sakura', 3, '꽃잎 꼬리', '🌸', { emojis: ['🌸'] }),
   item('flower_pop', 'feed', 'sakura', 3, '꽃가루', '🌼', { emojis: ['🌸', '🌼', '🌷'] }),
-  // 🪐 우주
+  // 🚀 우주
   item('silk', 'hat', 'space', 3, '실크햇', '🎩'),
   item('night', 'floor', 'space', 2, '밤하늘', '🌙', { colors: [0x4a4f80, 0x3c406c] }),
   item('galaxy_rail', 'rail', 'space', 3, '은하 레일', '🌌', { rail: [0x2b2b52, 0x3d3d70, 0x24244a] }),
   item('star_trail', 'trail', 'space', 3, '별똥별 꼬리', '⭐', { emojis: ['⭐', '✨'] }),
-  item('planet_pop', 'feed', 'space', 3, '행성 팡', '🪐', { emojis: ['🪐', '🌟'] }),
+  item('planet_pop', 'feed', 'space', 3, '로켓 팡', '🚀', { emojis: ['🚀', '🌟'] }),
   // 🎃 할로윈 (10월 이벤트에만)
   item('pumpkin_hat', 'hat', 'halloween', 3, '호박 모자', '🎃'),
   item('pumpkin_floor', 'floor', 'halloween', 3, '호박밭', '🎃', { colors: [0xf5c38a, 0xe8a868] }),

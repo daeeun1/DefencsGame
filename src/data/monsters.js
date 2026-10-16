@@ -28,10 +28,10 @@ export const MONSTERS = {
 
   // ── 동네 5~6 ──
   penguin: { name: '펭귄', emoji: '🐧', hp: 45, speed: 1.1, likes: 'drink', reward: 3, slowResist: 0.5 },
-  seal: { name: '물범', emoji: '🦭', hp: 75, speed: 0.7, likes: 'sea', reward: 4, size: 62 },
+  seal: { name: '아기 고래', emoji: '🐳', hp: 75, speed: 0.7, likes: 'sea', reward: 4, size: 62 },
   lizard: { name: '도마뱀', emoji: '🦎', hp: 30, speed: 1.55, likes: 'fry', reward: 3 },
   boar: { name: '멧돼지', emoji: '🐗', hp: 90, speed: 0.8, likes: 'grill', reward: 4, size: 62 },
-  raccoon: { name: '너구리', emoji: '🦝', hp: 40, speed: 1.2, likes: 'fry', reward: 3 },
+  raccoon: { name: '햄스터', emoji: '🐹', hp: 40, speed: 1.2, likes: 'fry', reward: 3 },
 
   // ── 🎃 이벤트 손님 ──
   pumpkin: { name: '호박 유령', emoji: '🎃', hp: 50, speed: 0.9, likes: 'chill', reward: 4 },

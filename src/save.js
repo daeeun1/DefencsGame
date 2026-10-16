@@ -8,7 +8,7 @@ const KEY = 'kitchen-defense-save-v1';
 
 function defaultSave() {
   return {
-    tips: 0, // 🪙 팁 (가게 강화에 쓰는 재화)
+    tips: 0, // 💰 팁 (가게 강화에 쓰는 재화)
     stages: {}, // 🗺️ 스테이지별 최고 별 { 'bakery-3': 2 }
     lines: [...STARTER_LINES], // 📖 모은 레시피 줄
     deck: [...STARTER_LINES], // 판에 가져가는 4줄

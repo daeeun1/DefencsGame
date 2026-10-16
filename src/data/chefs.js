@@ -86,7 +86,7 @@ export const METHODS = {
   },
   drink: {
     name: '음료',
-    emoji: '🧋',
+    emoji: '🥤',
     role: '옆 요리 칼질 속도 증가',
     damage: 4,
     interval: 1.0,
@@ -144,8 +144,8 @@ export const CHEFS = [
   chef('strawberry', '딸기 올리기', '🍓', 3, 'chill', { slow: { factor: 0.4, duration: 2 } }),
   chef('cake', '케이크', '🍰', 4, 'chill', { slow: { factor: 0.35, duration: 2.2 }, range: 260 }),
   // 🍲 국물 줄: 지속 피해
-  chef('veggie_prep', '재료 손질', '🧅', 1, 'boil'),
-  chef('broth', '사골 육수', '🦴', 2, 'boil'),
+  chef('veggie_prep', '재료 손질', '🥕', 1, 'boil'),
+  chef('broth', '어묵 국물', '🍥', 2, 'boil'),
   chef('spice', '양념 풀기', '🌶️', 3, 'boil'),
   chef('hotpot', '전골', '🍲', 4, 'boil', { range: 260 }),
   // 🍜 면 줄: 줄줄이 관통
@@ -157,24 +157,24 @@ export const CHEFS = [
   chef('shrimp_prep', '새우 손질', '🦐', 1, 'sea'),
   chef('squid', '오징어', '🦑', 2, 'sea'),
   chef('crab', '꽃게', '🦀', 3, 'sea'),
-  chef('lobster', '랍스터', '🦞', 4, 'sea', { range: 520 }),
-  // 🧋 음료 줄: 옆 요리 칼질 속도 증가
-  chef('ice_cup', '얼음', '🧊', 1, 'drink'),
+  chef('lobster', '참치', '🐟', 4, 'sea', { range: 520 }),
+  // 🥤 음료 줄: 옆 요리 칼질 속도 증가
+  chef('ice_cup', '빙수 얼음', '🍧', 1, 'drink'),
   chef('coffee', '커피', '☕', 2, 'drink', { cheer: { attackSpeed: 0.2 } }),
-  chef('latte', '라테', '🥤', 3, 'drink', { cheer: { attackSpeed: 0.27 } }),
-  chef('bubble_tea', '버블티', '🧋', 4, 'drink', { cheer: { attackSpeed: 0.35 } }),
+  chef('latte', '녹차 라테', '🍵', 3, 'drink', { cheer: { attackSpeed: 0.27 } }),
+  chef('bubble_tea', '버블티', '🥤', 4, 'drink', { cheer: { attackSpeed: 0.35 } }),
   // 🍤 튀김 줄: 먹이면 골드
   chef('potato_prep', '감자 손질', '🥔', 1, 'fry'),
   chef('fries', '감자튀김', '🍟', 2, 'fry'),
   chef('shrimp_fry', '새우튀김', '🍤', 3, 'fry', { goldPerHit: 2 }),
-  chef('fry_platter', '튀김 모듬', '🧆', 4, 'fry', { goldPerHit: 3 }),
+  chef('fry_platter', '튀김 만두', '🥟', 4, 'fry', { goldPerHit: 3 }),
   // 🛎️ 특별: 영웅 2개를 합칠 때 가끔 나온다
   chef('head_chef', '총괄 주방장', '🛎️', 4, 'buff', { special: true }),
 ];
 
 // 🥚 비밀 유닛: 뽑기에서 아주 낮은 확률로만 나온다. 합성할 수 없다.
 CHEFS.push(
-  chef('dishwasher', '설거지 담당', '🧽', 1, 'buff', {
+  chef('dishwasher', '설거지 담당', '🍽️', 1, 'buff', {
     hidden: true,
     buff: { attackSpeed: 0.1 },
     ability: '공격은 못 하지만 옆 유닛 공격 속도 +10%',
@@ -274,13 +274,13 @@ function mythic(id, name, emoji, method, stars, ingredients, ability, extra = {}
 
 const MYTHICS = [
   mythic('burger', '산더미 버거', '🍔', 'cut', 1, ['bread_loaf', 'drumstick'], '주변 3명도 같이 냠!', { pierce: { count: 4, radius: 170 } }),
-  mythic('crown_cupcake', '왕관 컵케이크', '🧁', 'chill', 1, ['bread_loaf', 'strawberry'], '이걸로 배부른 손님은 골드 +50%', { goldBonus: 0.5 }),
+  mythic('crown_cupcake', '왕관 케이크', '🎂', 'chill', 1, ['bread_loaf', 'strawberry'], '이걸로 배부른 손님은 골드 +50%', { goldBonus: 0.5 }),
   mythic('cloud_cake', '구름 케이크', '🍰', 'chill', 2, ['cake', 'shrimp_fry'], '3번에 1번, 손님이 1초 꾸벅 멈춤', {
     stun: { every: 3, duration: 1 },
     slow: { factor: 0.4, duration: 2 },
   }),
   mythic('rainbow_juice', '무지개 주스', '🍹', 'drink', 2, ['fry_platter', 'latte'], '옆 요리 칼질 +50%', { cheer: { attackSpeed: 0.5 } }),
-  mythic('forest_tea', '숲속 보약차', '🍵', 'boil', 1, ['latte', 'spice'], '레일 위 모든 손님이 15% 느려짐', { railSlow: 0.15 }),
+  mythic('forest_tea', '숲속 보약차', '🌿', 'boil', 1, ['latte', 'spice'], '레일 위 모든 손님이 15% 느려짐', { railSlow: 0.15 }),
   mythic('endless_noodle', '끝없는 국수', '🍜', 'noodle', 2, ['ramen', 'spice'], '줄줄이 8명까지 관통', { pierce: { count: 8, radius: 240 } }),
   mythic('seafood_hotpot', '해물 전골', '🍲', 'sea', 3, ['lobster', 'ramen', 'spaghetti'], '모든 손님이 좋아함 (항상 2배)', { alwaysLiked: true }),
   mythic('royal_dosirak', '산해진미 도시락', '🍱', 'grill', 3, ['whole_bbq', 'lobster', 'drumstick'], '보스에게 3배', { bossBonus: 3, splash: 120 }),

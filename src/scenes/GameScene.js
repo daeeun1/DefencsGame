@@ -212,7 +212,7 @@ export default class GameScene extends Phaser.Scene {
   specialDayGreeting() {
     const greetings = [];
     if (isChristmas()) greetings.push('🎅 메리 크리스마스! 요리들이 산타 모자를 썼어요');
-    if (this.seollal) greetings.push('🧧 새해 복 많이 받으세요! 호랑이 손님이 떡국 먹으러 와요');
+    if (this.seollal) greetings.push('🎍 새해 복 많이 받으세요! 호랑이 손님이 떡국 먹으러 와요');
     if (greetings.length > 0) this.eggFound('holiday');
     if (this.lateNight) {
       greetings.push('🌙 야식 타임! 고양이 손님이 몰려와요');
@@ -324,7 +324,7 @@ export default class GameScene extends Phaser.Scene {
     const frozen = this.freezeTimeLeft > 0;
     this.freezeOverlay.setVisible(frozen);
     const rush = this.rushTimeLeft > 0 ? this.gimmick.factor : 1;
-    const tea = 1 - this.railSlow; // 🍵 숲속 보약차: 레일 위 모든 손님이 느려진다
+    const tea = 1 - this.railSlow; // 🌿 숲속 보약차: 레일 위 모든 손님이 느려진다
     for (const monster of [...this.monsters]) {
       const moveScale = (frozen ? (monster.isBoss ? 0.5 : 0) : 1) * rush * tea * (this.mod.orderSpeed ?? 1);
       const dotDamage = monster.step(dt, moveScale);
@@ -491,7 +491,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 손님 배가 꽉 찼을 때: 팁(골드)을 남기고 레일에서 떠난다
   feedMonster(monster, source = null) {
-    // 🧁 왕관 컵케이크로 배부른 손님은 골드를 더 남긴다
+    // 🎂 왕관 케이크로 배부른 손님은 골드를 더 남긴다
     if (source?.stats?.goldBonus) monster.reward = Math.round(monster.reward * (1 + source.stats.goldBonus));
     this.gold += monster.reward;
     this.monstersFed += 1;
@@ -734,7 +734,7 @@ export default class GameScene extends Phaser.Scene {
     this.log(`[뽑기] ${TIERS[tier].name} ${data.emoji} ${data.name}`, colorToHex(TIERS[tier].color));
     if (tier >= 2) this.showBanner(`✨ ${TIERS[tier].name}! ${data.name}`, colorToHex(TIERS[tier].color), 44);
     if (data.hidden) {
-      this.showBanner('🧽 설거지 담당이 왔어요!', COLORS.gold, 44);
+      this.showBanner('🍽️ 설거지 담당이 왔어요!', COLORS.gold, 44);
       this.eggFound('dishwasher');
     }
 
@@ -1142,7 +1142,7 @@ export default class GameScene extends Phaser.Scene {
   updateBuffs() {
     for (const chef of this.chefs) {
       let lead = 0; // 🛎️ 총괄 주방장 (가장 센 것 하나)
-      let cheer = 0; // 🧋 음료 줄 (가장 센 것 하나)
+      let cheer = 0; // 🥤 음료 줄 (가장 센 것 하나)
       for (const other of this.chefs) {
         if (other === chef) continue;
         const near = Math.abs(other.slot.col - chef.slot.col) <= 1 && Math.abs(other.slot.row - chef.slot.row) <= 1;
@@ -1357,7 +1357,7 @@ export default class GameScene extends Phaser.Scene {
     this.updateBuffs();
     burst(this, this.effectLayer, x, y, [0xffd54f, 0xfff8ec], 10);
     this.floatText(x, y - 30, `+${price}`, COLORS.gold);
-    this.log(`[판매] ${chef.stats.emoji} ${chef.stats.name} → 🪙 +${price}`, COLORS.gold);
+    this.log(`[판매] ${chef.stats.emoji} ${chef.stats.name} → 💰 +${price}`, COLORS.gold);
     sfx.coin();
     this.updateHud();
   }
@@ -1535,7 +1535,7 @@ export default class GameScene extends Phaser.Scene {
     let y = centerY + 10;
     const tipRate = this.tipRate();
     const bonus = tipRate !== 1 ? ` · ×${Math.round(tipRate * 100) / 100}` : '';
-    text(y, `🪙 팁 +${rewards.tips}  (손님 ${this.monstersFed}명 · 별 ${rewards.stars}개${bonus})`, 26, COLORS.gold, true);
+    text(y, `💰 팁 +${rewards.tips}  (손님 ${this.monstersFed}명 · 별 ${rewards.stars}개${bonus})`, 26, COLORS.gold, true);
     if (rewards.xp > 0) {
       const ups = rewards.levelUps.length > 0 ? `  ⬆️ ${rewards.levelUps.join(' ')}` : '';
       text((y += 40), `📖 줄 경험치 +${rewards.xp}${ups}`, 22, rewards.levelUps.length > 0 ? COLORS.gold : '#d8c8b4', rewards.levelUps.length > 0);
@@ -1613,7 +1613,7 @@ export default class GameScene extends Phaser.Scene {
       if (!save.events[this.run.event.key]) {
         save.events[this.run.event.key] = true;
         bonusTips = EVENT_BONUS;
-        unlocked.push(`${this.run.event.emoji} 이벤트 첫 클리어 보너스 🪙+${EVENT_BONUS}`);
+        unlocked.push(`${this.run.event.emoji} 이벤트 첫 클리어 보너스 💰+${EVENT_BONUS}`);
       }
     }
 
@@ -1820,7 +1820,7 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 골드
-    this.add.text(254, cy, '🪙', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(hud.h * 0.34)}px` }).setOrigin(0.5);
+    this.add.text(254, cy, '💰', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(hud.h * 0.34)}px` }).setOrigin(0.5);
     this.hudGold = this.add
       .text(280, cy + 2, '', { fontFamily: FONT, fontSize: `${Math.round(hud.h * 0.36)}px`, fontStyle: 'bold', color: COLORS.gold })
       .setOrigin(0, 0.5);

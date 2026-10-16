@@ -81,7 +81,7 @@ export default class UpgradePanel {
       if (lv >= LINE_UPGRADE_MAX) row.button.setLabel('MAX').setEnabled(false);
       else {
         const cost = this.getCost(row.line);
-        row.button.setLabel(`🪙 ${cost}`).setEnabled(this.getGold() >= cost);
+        row.button.setLabel(`💰 ${cost}`).setEnabled(this.getGold() >= cost);
       }
     }
   }

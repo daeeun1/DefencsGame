@@ -9,7 +9,7 @@ export const MISSIONS = [
   { id: 'serve', emoji: '😋', text: '손님 40명 배부르게', event: 'serve', target: 40, reward: { gold: 50 } },
   { id: 'chop', emoji: '🔪', text: '톡 칼질 돕기 15번', event: 'chop', target: 15, reward: { gold: 40 } },
   { id: 'upgrade', emoji: '⬆️', text: '종류별 강화 2번', event: 'upgrade', target: 2, reward: { gold: 60 } },
-  { id: 'hero', emoji: '🟣', text: '영웅 요리 만들기', event: 'hero', target: 1, reward: { upgrade: 1 } },
+  { id: 'hero', emoji: '💜', text: '영웅 요리 만들기', event: 'hero', target: 1, reward: { upgrade: 1 } },
   { id: 'mythic', emoji: '📖', text: '신화 요리 만들기', event: 'mythic', target: 1, reward: { gold: 120 } },
   { id: 'swap', emoji: '🔀', text: '요리 바꾸기 2번', event: 'swap', target: 2, reward: { free: 2 } },
   { id: 'legend', emoji: '🌟', text: '전설 요리 만들기', event: 'legend', target: 1, reward: { gold: 150 } },
@@ -17,7 +17,7 @@ export const MISSIONS = [
 
 // 보상을 글로
 export function rewardText(reward, wave) {
-  if (reward.gold) return `🪙 ${missionGold(reward.gold, wave)}`;
+  if (reward.gold) return `💰 ${missionGold(reward.gold, wave)}`;
   if (reward.free) return `🎲 무료 ${reward.free}번`;
   return `⬆️ 무료 강화`;
 }

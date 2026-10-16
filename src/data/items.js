@@ -25,7 +25,7 @@ export const TOOL_MAX_LEVEL = 5;
 export const TOOL_SLOTS = [
   { id: 'knife', emoji: '🔪', name: '칼' },
   { id: 'pan', emoji: '🍳', name: '냄비' },
-  { id: 'coat', emoji: '🥼', name: '옷' },
+  { id: 'coat', emoji: '👕', name: '옷' },
 ];
 
 export const TOOLS = [
@@ -41,11 +41,11 @@ export const TOOLS = [
   { id: 'iron_pot', slot: 'pan', tier: 2, emoji: '🍳', name: '무쇠 솥', effect: { damage: 0.08 } },
   { id: 'copper_pot', slot: 'pan', tier: 3, emoji: '🥘', name: '구리 냄비', effect: { damage: 0.12 } },
   { id: 'rainbow_pot', slot: 'pan', tier: 4, emoji: '🌈', name: '전설의 무지개 냄비', effect: { damage: 0.2 } },
-  // 🥼 옷: 골드, 손 힘, 팁
-  { id: 'cotton_apron', slot: 'coat', tier: 1, emoji: '🥼', name: '면 앞치마', effect: { startGold: 15 } },
+  // 👕 옷: 골드, 손 힘, 팁
+  { id: 'cotton_apron', slot: 'coat', tier: 1, emoji: '👕', name: '면 앞치마', effect: { startGold: 15 } },
   { id: 'gloves', slot: 'coat', tier: 1, emoji: '🧤', name: '주방 장갑', effect: { hand: 2 } },
-  { id: 'check_apron', slot: 'coat', tier: 2, emoji: '🥼', name: '체크 앞치마', effect: { startGold: 25, tips: 0.05 } },
-  { id: 'chef_coat', slot: 'coat', tier: 3, emoji: '🥼', name: '셰프 가운', effect: { startGold: 40, hand: 3 } },
+  { id: 'check_apron', slot: 'coat', tier: 2, emoji: '👕', name: '체크 앞치마', effect: { startGold: 25, tips: 0.05 } },
+  { id: 'chef_coat', slot: 'coat', tier: 3, emoji: '👕', name: '셰프 가운', effect: { startGold: 40, hand: 3 } },
   { id: 'star_coat', slot: 'coat', tier: 4, emoji: '🌟', name: '전설의 별 가운', effect: { startGold: 50, summonDiscount: 2, tips: 0.1 } },
 ];
 

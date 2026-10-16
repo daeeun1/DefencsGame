@@ -49,7 +49,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(centerX, top + 500, '배고픈 몬스터 손님을 배불리 먹여라!', { fontFamily: FONT, fontSize: '30px', color: COLORS.gold })
       .setOrigin(0.5);
     this.add
-      .text(centerX, top + 570, `🪙 팁 ${save.tips}    ⭐ 별 ${totalStars()}`, {
+      .text(centerX, top + 570, `💰 팁 ${save.tips}    ⭐ 별 ${totalStars()}`, {
         fontFamily: FONT,
         fontSize: '34px',
         fontStyle: 'bold',
@@ -194,7 +194,7 @@ export default class TitleScene extends Phaser.Scene {
       text(centerY - 100, event.name, 38, COLORS.gold, true),
       text(centerY - 30, event.desc, 24),
       text(centerY + 50, `${event.endsIn}일 남음 · 15웨이브 · 지금 가장 먼 동네 난이도`, 22, '#d8c8b4'),
-      text(centerY + 110, done ? '✅ 이번 이벤트 보너스를 받았어요' : `🎁 처음 깨면 🪙${EVENT_BONUS} 보너스`, 26, done ? '#b9c2cf' : COLORS.gold, true),
+      text(centerY + 110, done ? '✅ 이번 이벤트 보너스를 받았어요' : `🎁 처음 깨면 💰${EVENT_BONUS} 보너스`, 26, done ? '#b9c2cf' : COLORS.gold, true),
     ];
     const close = () => parts.forEach((p) => p.destroy());
     parts.push(
@@ -256,7 +256,7 @@ export default class TitleScene extends Phaser.Scene {
         this.add.text(centerX - 200, y - 22, q.text, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0, 0.5),
         this.add.text(centerX + 70, y + 31, `${q.progress}/${q.target}`, { fontFamily: FONT, fontSize: '20px', color: '#d8c8b4' }).setOrigin(0, 0.5),
       );
-      const label = q.claimed ? '✅ 받음' : q.done ? `🪙 ${QUEST_REWARD} 받기` : `🪙 ${QUEST_REWARD}`;
+      const label = q.claimed ? '✅ 받음' : q.done ? `💰 ${QUEST_REWARD} 받기` : `💰 ${QUEST_REWARD}`;
       const button = createButton(this, centerX + 205, y + 10, 140, 70, label, () => {
         // 받으면 팁 숫자를 다시 그리고 창을 다시 연다
         if (claimQuest(q.id) > 0) this.scene.restart({ showQuests: true });
@@ -266,7 +266,7 @@ export default class TitleScene extends Phaser.Scene {
 
     const bonusReady = canClaimBonus();
     parts.push(
-      createButton(this, centerX, centerY + 270, 460, 80, bonusReady ? `🎁 모두 완료 보너스 🪙${QUEST_BONUS} 받기` : `🎁 3개 다 하면 🪙${QUEST_BONUS} 보너스`, () => {
+      createButton(this, centerX, centerY + 270, 460, 80, bonusReady ? `🎁 모두 완료 보너스 💰${QUEST_BONUS} 받기` : `🎁 3개 다 하면 💰${QUEST_BONUS} 보너스`, () => {
         if (claimBonus() > 0) this.scene.restart({ showQuests: true });
       }, { fontSize: 24, color: 0xc77d2e, enabled: bonusReady }),
     );

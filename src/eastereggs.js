@@ -7,7 +7,7 @@ export const EGGS = {
   pot: '♨️ 냄비가 넘쳤다',
   ramen: '🍜 라면 먹는 황금 고양이',
   pet: '😊 요리 쓰다듬기',
-  dishwasher: '🧽 설거지 담당',
+  dishwasher: '🍽️ 설거지 담당',
   golden: '✨ 황금 손님',
   streak: '🎉 오늘은 ○○의 날',
   gg: '🎮 GG',

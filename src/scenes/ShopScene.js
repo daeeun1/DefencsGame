@@ -37,7 +37,7 @@ export default class ShopScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_WIDTH, 120, COLORS.hud).setOrigin(0);
     this.add.text(GAME_WIDTH / 2, 42, '🏪 가게', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5);
     this.add
-      .text(GAME_WIDTH / 2, 92, `🪙 팁 ${save.tips}`, { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: COLORS.gold })
+      .text(GAME_WIDTH / 2, 92, `💰 팁 ${save.tips}`, { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: COLORS.gold })
       .setOrigin(0.5);
     const back = this.add.text(24, 60, '←', { fontFamily: FONT, fontSize: '48px', color: COLORS.text }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
@@ -96,7 +96,7 @@ export default class ShopScene extends Phaser.Scene {
       if (box.id === 'style') info.push(odds(STYLE_ODDS));
       if (box.pity) info.push(`전설까지 최대 ${box.pity - (save.pity?.[box.id] ?? 0)}번`);
       if (info.length) this.add.text(180, y + 106, info.join('  ·  '), { fontFamily: FONT, fontSize: '15px', color: '#b9a48f' }).setOrigin(0, 0.5);
-      createButton(this, GAME_WIDTH - 150, y + 150, 200, 54, `🪙 ${box.cost}`, () => this.open(box.id, 'tips'), {
+      createButton(this, GAME_WIDTH - 150, y + 150, 200, 54, `💰 ${box.cost}`, () => this.open(box.id, 'tips'), {
         fontSize: 24,
         color: box.color,
         enabled: save.tips >= box.cost,
@@ -134,7 +134,7 @@ export default class ShopScene extends Phaser.Scene {
     revealEffect(this, layer, cx, cy - 60, result.tier, tier.color);
     sfx.summon(Math.min(3, result.tier));
     if (result.tier >= 3) sfx.mythic();
-    let emoji = '🪙';
+    let emoji = '💰';
     let title = '';
     let sub = '';
     if (result.kind === 'tool') {
@@ -153,7 +153,7 @@ export default class ShopScene extends Phaser.Scene {
       title = `[${tier.name}] ${result.item.name}`;
       sub = result.isNew
         ? `✨ 새 ${slot.name}! (${themeById(result.item.theme).emoji} ${themeById(result.item.theme).name} 세트)\n🎨 꾸미기에서 써 보세요`
-        : `이미 가진 꾸미기 → 🪙 팁 ${result.refund} 돌려받기`;
+        : `이미 가진 꾸미기 → 💰 팁 ${result.refund} 돌려받기`;
     }
     layer.add(this.add.circle(cx, cy - 60, 110, tier.color, 0.35).setStrokeStyle(8, tier.color));
     const icon = this.add.text(cx, cy - 60, emoji, { fontFamily: EMOJI_FONT, fontSize: '120px' }).setOrigin(0.5).setScale(0);
@@ -165,7 +165,7 @@ export default class ShopScene extends Phaser.Scene {
         .setOrigin(0.5),
     );
     layer.add(this.add.text(cx, cy + 175, sub, { fontFamily: FONT, fontSize: '24px', color: COLORS.text, align: 'center', lineSpacing: 6 }).setOrigin(0.5, 0));
-    const again = createButton(this, cx - 135, cy + 330, 240, 90, `한 번 더 🪙${result.box.cost}`, () => {
+    const again = createButton(this, cx - 135, cy + 330, 240, 90, `한 번 더 💰${result.box.cost}`, () => {
       layer.destroy();
       this.draw();
       this.open(result.box.id, 'tips');
