@@ -352,8 +352,15 @@ export default class TitleScene extends Phaser.Scene {
     parts.push(status, link);
 
     parts.push(
-      this.add.text(centerX, centerY + 290, 'v0.20 · 개발 중', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' }).setOrigin(0.5),
+      this.add.text(centerX, centerY + 270, 'v0.20 · 개발 중', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' }).setOrigin(0.5),
     );
+    // 📜 쓰인 글꼴·라이브러리 라이선스 (OFL은 라이선스 글을 함께 배포해야 한다)
+    const licenses = this.add
+      .text(centerX, centerY + 300, '📜 글꼴·라이브러리 라이선스', { fontFamily: FONT, fontSize: '20px', color: '#8fb4d8' })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    licenses.on('pointerup', () => window.open('LICENSES.txt', '_blank'));
+    parts.push(licenses);
     const close = () => {
       off();
       parts.forEach((p) => p.destroy());

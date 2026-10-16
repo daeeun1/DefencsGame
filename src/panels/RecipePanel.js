@@ -114,7 +114,7 @@ export default class RecipePanel {
         .setOrigin(0, 0.5),
     );
     const parts = recipe.ingredients.map((id, k) => `[${chefById(id).emoji}${have[k] ? '✅' : '⬜'}]`).join(' + ');
-    c.add(scene.add.text(left + 100, y + 56, parts, { fontFamily: EMOJI_FONT, fontSize: '22px', color: COLORS.text }).setOrigin(0, 0.5));
+    c.add(scene.add.text(left + 100, y + 56, parts, { fontFamily: FONT, fontSize: '22px', color: COLORS.text }).setOrigin(0, 0.5));
     c.add(scene.add.text(left + 100, y + 88, result.ability, { fontFamily: FONT, fontSize: '19px', color: ready ? '#fff3c4' : '#b9a48f' }).setOrigin(0, 0.5));
     const button = createButton(scene, left + PANEL_WIDTH - 90, y + 49, 130, 66, '만들기', () => this.onCraft(recipe), { fontSize: 24, color: 0xc0392b, enabled: ready });
     c.add(button);
@@ -129,7 +129,7 @@ export default class RecipePanel {
     this.container.add(
       scene.add
         .text(this.left + 36, y + SMALL_ROW / 2, `${result.emoji} ${result.name} ${'★'.repeat(recipe.stars)}   ${parts}`, {
-          fontFamily: EMOJI_FONT,
+          fontFamily: FONT,
           fontSize: '22px',
           color: '#9a8a7a',
         })

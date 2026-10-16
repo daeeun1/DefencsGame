@@ -88,5 +88,18 @@ src/
 
 ## 🙂 이모지 글꼴
 
-폰마다 이모지 글꼴이 달라서 X로 보이는 일을 막으려고, 게임이 쓰는 이모지만 잘라 낸 Noto Color Emoji를 함께 넣었다 (`src/assets/emoji/`, `src/emojiFont.js`, 아이폰·맥은 원래 이모지).
+폰마다 이모지 글꼴이 달라서 X로 보이는 일을 막으려고, 게임이 쓰는 이모지만 잘라 낸 Noto Color Emoji를 함께 넣었다 (`src/assets/emoji/`, `src/emojiFont.js`, 아이폰·갤럭시 모두 같은 모양).
 새 이모지를 쓰면 `pip install fonttools brotli` 후 `python3 scripts/emoji-subset.py`로 다시 만든다.
+
+## 📜 라이선스 (상업적 사용)
+
+모두 무료이고 유료 앱·광고·결제가 있는 게임에 쓸 수 있다. 목록과 라이선스 전문은 `public/LICENSES.txt` (게임 설정 창의 "📜 글꼴·라이브러리 라이선스"에서 열림).
+
+| 쓰인 것 | 라이선스 | 지킬 것 |
+|---|---|---|
+| Galmuri 글꼴 | SIL OFL 1.1 | 글꼴 파일만 따로 팔지 않기, 라이선스 글 함께 두기 |
+| Noto Color Emoji (잘라서 GameEmoji로) | SIL OFL 1.1 | 위와 같음 |
+| Phaser | MIT | 저작권 글 함께 두기 |
+| Firebase SDK | Apache 2.0 | 무료 요금제(Spark) 한도를 넘으면 요금이 나올 수 있음 |
+
+그림은 모두 이모지(위 글꼴), 소리는 코드로 만든 소리라 따로 산 그림·소리 파일은 없다.

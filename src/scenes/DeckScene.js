@@ -38,13 +38,13 @@ export default class DeckScene extends Phaser.Scene {
     const wants = [...new Set(guests.map((m) => m.likes).filter((l) => l && l !== 'random'))];
     this.add
       .text(GAME_WIDTH / 2, 160, `${town.emoji} ${town.name} 손님: ${guests.map((m) => m.emoji).join('')}`, {
-        fontFamily: EMOJI_FONT,
+        fontFamily: FONT,
         fontSize: '26px',
         color: COLORS.text,
       })
       .setOrigin(0.5);
     this.add
-      .text(GAME_WIDTH / 2, 200, `좋아하는 요리: ${wants.map((l) => METHODS[l].emoji).join(' ')}`, { fontFamily: EMOJI_FONT, fontSize: '24px', color: '#d8c8b4' })
+      .text(GAME_WIDTH / 2, 200, `좋아하는 요리: ${wants.map((l) => METHODS[l].emoji).join(' ')}`, { fontFamily: FONT, fontSize: '24px', color: '#d8c8b4' })
       .setOrigin(0.5);
 
     const left = (GAME_WIDTH - CARD_W * 2 - GAP) / 2;

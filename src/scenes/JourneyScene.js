@@ -69,11 +69,11 @@ export default class JourneyScene extends Phaser.Scene {
         .map((key) => MONSTERS[key].emoji)
         .join('');
       this.add
-        .text(130, top + 66, `웨이브 ${from}~${from + TOWN_WAVES - 1} · ${guests}`, { fontFamily: EMOJI_FONT, fontSize: '21px', color: dark })
+        .text(130, top + 66, `웨이브 ${from}~${from + TOWN_WAVES - 1} · ${guests}`, { fontFamily: FONT, fontSize: '21px', color: dark })
         .setOrigin(0, 0.5);
       const stars = townStars(i);
       this.add
-        .text(130, top + 100, `보스 ${MONSTERS[town.boss].emoji}  ${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}`, { fontFamily: EMOJI_FONT, fontSize: '20px', color: dark })
+        .text(130, top + 100, `보스 ${MONSTERS[town.boss].emoji}  ${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}`, { fontFamily: FONT, fontSize: '20px', color: dark })
         .setOrigin(0, 0.5);
       if (unlocked) {
         const label = i === 0 ? '▶ 처음부터' : '▶ 여기서 출발';

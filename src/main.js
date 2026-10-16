@@ -33,9 +33,8 @@ async function loadFonts() {
 }
 
 // 🙂 게임용 이모지 글꼴: 폰의 이모지 글꼴이 오래됐거나 없어서 X로 보이는 일을 막는다.
-// 아이폰·맥은 원래 이모지(Apple Color Emoji)가 잘 나오니 그대로 둔다.
+// 아이폰·갤럭시·컴퓨터 어디서나 같은 모양으로 보인다 (스토어 스크린샷도 이 이모지로: 라이선스가 자유롭다)
 async function loadEmojiFont() {
-  if (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)) return;
   try {
     const faces = EMOJI_FACES.map(({ url, range }) => new FontFace('GameEmoji', `url(${url})`, { unicodeRange: range }));
     await Promise.all(faces.map((face) => face.load()));
