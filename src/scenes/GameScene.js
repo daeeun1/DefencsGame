@@ -54,6 +54,7 @@ const DRAG_THRESHOLD = 12;
 // 요리사가 서는 안쪽 칸 수 (레일 한 줄을 뺀 나머지)
 const INNER_COLS = BOARD_COLS - 2;
 const INNER_ROWS = BOARD_ROWS - 2;
+const OFF_DECK_HP = 0.7; // 덱에 없는 요리를 좋아하는 손님의 배고픔 배율
 
 // 실제 게임이 진행되는 장면.
 // 주문이 레일을 돌고, 요리사를 뽑아 주문을 처리하고, 주문이 너무 쌓이면 패배한다.
@@ -417,7 +418,9 @@ export default class GameScene extends Phaser.Scene {
     // 🍽️ 특별 규칙: 손님 배고픔, 추가 골드
     const value = (v) => (typeof v === 'function' ? v(this.wave) : v);
     const runHp = monster.isBoss ? value(this.run.bossHp) : value(this.run.hp);
-    const hpScale = runHp * (this.mod.orderHp ?? 1) * (monster.isBoss ? this.mod.bossHp ?? 1 : 1);
+    // 덱에 없는 요리를 좋아하는 손님은 배고픔이 조금 덜하다 (한 판 동안 덱을 못 바꾸니 뒤 동네에서 벽이 생기지 않게)
+    const offDeck = !monster.isBoss && monster.likes && !this.deck.includes(monster.likes) ? OFF_DECK_HP : 1;
+    const hpScale = runHp * offDeck * (this.mod.orderHp ?? 1) * (monster.isBoss ? this.mod.bossHp ?? 1 : 1);
     if (hpScale !== 1) {
       monster.maxHp = Math.round(monster.maxHp * hpScale);
       monster.hp = monster.maxHp;

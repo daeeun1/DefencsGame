@@ -31,16 +31,18 @@ const GIMMICKS = Object.fromEntries(KITCHENS.filter((k) => k.gimmick).map((k) =>
 
 export const JOURNEY = {
   hpBase: 1.0, // 손님 배고픔 배율 (1웨이브)
-  hpGrowth: 1.15, // 웨이브마다 배고픔이 몇 배씩 커지는지
+  hpGrowth: 1.15, // 웨이브마다 배고픔이 몇 배씩 커지는지 (30웨이브까지)
+  lateFrom: 30, // 이 웨이브부터는 조금 덜 가파르게 (눈산·화산에서 벽이 생기지 않게)
+  lateGrowth: 1.09,
   bossBase: 0.6, // 보스 배고픔 배율
-  bossGrowth: 1.45, // 동네(보스)마다 보스 배고픔이 몇 배씩 커지는지
+  bossGrowth: 1.35, // 동네(보스)마다 보스 배고픔이 몇 배씩 커지는지
   railLimit: 40,
 };
 
 const BOSSES = ['owl', 'pig', 'lion', 'octopus', 'snowman', 'dragon'];
 
-// 동네 5, 6의 주방 사고: 웨이브마다 돌아가며
-const TOWN_GIMMICKS = { 4: ['sushi_bar', 'chinese', 'blackout'], 5: ['chinese', 'blackout', 'sushi_bar'] };
+// 동네 5, 6의 주방 사고: 두 웨이브에 한 번씩 돌아가며 (null = 쉬는 웨이브)
+const TOWN_GIMMICKS = { 4: ['sushi_bar', null, 'chinese', null, 'blackout', null], 5: ['chinese', null, 'blackout', null, 'sushi_bar', null] };
 
 export function journeyRun(deck = STARTER_LINES, startTown = 0) {
   const startWave = startTown * TOWN_WAVES + 1;
@@ -54,13 +56,14 @@ export function journeyRun(deck = STARTER_LINES, startTown = 0) {
     totalWaves: Infinity,
     bossAt: (wave) => (wave % TOWN_WAVES === 0 ? BOSSES[(wave / TOWN_WAVES - 1) % BOSSES.length] : undefined),
     mix: (wave) => journeyMix(wave),
-    hp: (wave) => JOURNEY.hpBase * JOURNEY.hpGrowth ** (wave - 1),
+    hp: (wave) => journeyHp(wave),
     hpWave: 1,
     bossHp: (wave) => JOURNEY.bossBase * JOURNEY.bossGrowth ** Math.floor((wave - 1) / TOWN_WAVES) * (wave > 60 ? 1.5 : 1),
     railLimit: JOURNEY.railLimit,
     gimmickAt: (wave) => {
       const list = TOWN_GIMMICKS[townOfWave(wave)];
-      return list ? GIMMICKS[list[wave % list.length]] : null;
+      const id = list?.[wave % list.length];
+      return id ? GIMMICKS[id] : null;
     },
     floorAt: (wave) => TOWNS[townOfWave(wave)].floor,
     floor: TOWNS[startTown].floor,
@@ -71,8 +74,16 @@ export function journeyRun(deck = STARTER_LINES, startTown = 0) {
     deck,
     rule: {},
     board: 'endless',
-    count: (wave) => 7 + Math.floor(((wave - 1) % TOWN_WAVES) / 2) + townOfWave(wave) + Math.floor(Math.max(0, wave - 60) / 10),
+    // 손님 수: 동네 안에서 조금씩 늘고, 동네가 뒤일수록 조금 더 (뒤 동네는 배고픔이 커서 수는 천천히)
+    count: (wave) => 7 + Math.floor(((wave - 1) % TOWN_WAVES) / 2) + Math.min(townOfWave(wave), 3) + Math.floor(Math.max(0, wave - 60) / 10),
   };
+}
+
+// 여정의 손님 배고픔 배율: 30웨이브까지 1.15배씩, 그 뒤로는 1.11배씩
+export function journeyHp(wave) {
+  const early = Math.min(wave, JOURNEY.lateFrom) - 1;
+  const late = Math.max(0, wave - JOURNEY.lateFrom);
+  return JOURNEY.hpBase * JOURNEY.hpGrowth ** early * JOURNEY.lateGrowth ** late;
 }
 
 // 여정의 손님 비율: 그 동네 손님 중 나올 차례가 된 손님 (from = 동네 안에서 몇 번째 웨이브부터)

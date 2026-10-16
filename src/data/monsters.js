@@ -83,7 +83,7 @@ export const MONSTERS = {
   octopus: {
     name: '문어 선장',
     emoji: '🐙',
-    hp: 5500,
+    hp: 4600,
     speed: 0.55,
     likes: 'sea',
     reward: 180,
@@ -96,7 +96,7 @@ export const MONSTERS = {
   snowman: {
     name: '눈사람 대장',
     emoji: '⛄',
-    hp: 7000,
+    hp: 6000,
     speed: 0.5,
     likes: 'boil',
     reward: 200,
