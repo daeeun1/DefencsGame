@@ -58,7 +58,7 @@ export default class DeckScene extends Phaser.Scene {
       if (owned) {
         const { level } = lineLevelOf(save.lineXp?.[line] ?? 0);
         this.add.text(x + CARD_W - 16, y + 32, `Lv.${level}`, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: COLORS.gold }).setOrigin(1, 0.5);
-        this.add.text(x + 18, y + 72, method.role, { fontFamily: FONT, fontSize: '18px', color: '#d8c8b4' }).setOrigin(0, 0.5);
+        this.add.text(x + 18, y + 72, method.role, { fontFamily: FONT, fontSize: '21px', color: '#d8c8b4' }).setOrigin(0, 0.5);
         this.add
           .text(x + 18, y + 106, chefsOfLine(line).map((c) => c.emoji).join(' '), { fontFamily: EMOJI_FONT, fontSize: '24px' })
           .setOrigin(0, 0.5);

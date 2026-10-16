@@ -59,7 +59,7 @@ export default class RankingScene extends Phaser.Scene {
         GAME_WIDTH / 2,
         215,
         `점수 = 웨이브×${SCORE_RULE.wave} + 손님×${SCORE_RULE.order} + 별×${SCORE_RULE.star}`,
-        { fontFamily: FONT, fontSize: '19px', color: '#b9a48f' },
+        { fontFamily: FONT, fontSize: '21px', color: '#b9a48f' },
       )
       .setOrigin(0.5);
 
@@ -73,7 +73,7 @@ export default class RankingScene extends Phaser.Scene {
         bg,
         rank: this.add.text(50, y, '', { ...style, fontStyle: 'bold' }).setOrigin(0, 0.5),
         name: this.add.text(130, y, '', style).setOrigin(0, 0.5),
-        detail: this.add.text(GAME_WIDTH - 190, y, '', { ...style, fontSize: '17px', color: '#b9a48f' }).setOrigin(1, 0.5),
+        detail: this.add.text(GAME_WIDTH - 190, y, '', { ...style, fontSize: '20px', color: '#b9a48f' }).setOrigin(1, 0.5),
         score: this.add.text(GAME_WIDTH - 40, y, '', { ...style, fontStyle: 'bold', color: COLORS.gold }).setOrigin(1, 0.5),
       };
     });

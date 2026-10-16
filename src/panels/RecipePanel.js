@@ -5,8 +5,8 @@ import { isDiscovered } from '../save.js';
 import { sfx } from '../audio.js';
 
 const PANEL_WIDTH = GAME_WIDTH - 24;
-const BIG_ROW = 100; // 이 덱으로 만들 수 있는 신화
-const SMALL_ROW = 50; // 이 덱으로는 못 만드는 신화 (흐리게)
+const BIG_ROW = 108; // 이 덱으로 만들 수 있는 신화
+const SMALL_ROW = 52; // 이 덱으로는 못 만드는 신화 (흐리게)
 
 // 📖 신화 조합표: 아래에서 반쯤 올라오는 판. 열려 있는 동안 게임은 느려진다 (GameScene).
 // 덱으로 만들 수 있는 신화가 위에 크게, 못 만드는 건 아래에 흐리게.
@@ -70,7 +70,7 @@ export default class RecipePanel {
     c.add(scene.add.text(left + 28, top + 40, '📖 신화 조합표', { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0, 0.5));
     c.add(
       scene.add
-        .text(left + 28, top + 82, '재료 요리를 판에 모으면 만들 수 있어요 (게임이 느려져요)', { fontFamily: FONT, fontSize: '18px', color: '#d8c8b4' })
+        .text(left + 28, top + 82, '재료 요리를 판에 모으면 만들 수 있어요 (게임이 느려져요)', { fontFamily: FONT, fontSize: '20px', color: '#d8c8b4' })
         .setOrigin(0, 0.5),
     );
     c.add(createButton(scene, left + PANEL_WIDTH - 70, top + 44, 100, 60, '닫기', () => this.close(), { fontSize: 22, color: 0x7d8594 }));
@@ -81,7 +81,7 @@ export default class RecipePanel {
       y += BIG_ROW;
     }
     if (this.other.length) {
-      c.add(scene.add.text(left + 28, y + 18, '다른 덱으로 만드는 신화', { fontFamily: FONT, fontSize: '18px', color: '#8a7a6a' }).setOrigin(0, 0.5));
+      c.add(scene.add.text(left + 28, y + 18, '다른 덱으로 만드는 신화', { fontFamily: FONT, fontSize: '20px', color: '#8a7a6a' }).setOrigin(0, 0.5));
       y += 40;
       for (const recipe of this.other) {
         this.drawSmall(recipe, y);
@@ -106,7 +106,7 @@ export default class RecipePanel {
       g.strokeRoundedRect(left + 14, y, PANEL_WIDTH - 28, BIG_ROW - 10, 16);
     }
     c.add(g);
-    c.add(scene.add.text(left + 58, y + 45, result.emoji, { fontFamily: EMOJI_FONT, fontSize: '46px' }).setOrigin(0.5));
+    c.add(scene.add.text(left + 58, y + 49, result.emoji, { fontFamily: EMOJI_FONT, fontSize: '46px' }).setOrigin(0.5));
     const made = isDiscovered(result.id) ? '' : '  NEW';
     c.add(
       scene.add
@@ -115,8 +115,8 @@ export default class RecipePanel {
     );
     const parts = recipe.ingredients.map((id, k) => `[${chefById(id).emoji}${have[k] ? '✅' : '⬜'}]`).join(' + ');
     c.add(scene.add.text(left + 100, y + 56, parts, { fontFamily: EMOJI_FONT, fontSize: '22px', color: COLORS.text }).setOrigin(0, 0.5));
-    c.add(scene.add.text(left + 100, y + 80, result.ability, { fontFamily: FONT, fontSize: '16px', color: ready ? '#fff3c4' : '#b9a48f' }).setOrigin(0, 0.5));
-    const button = createButton(scene, left + PANEL_WIDTH - 90, y + 45, 130, 66, '만들기', () => this.onCraft(recipe), { fontSize: 24, color: 0xc0392b, enabled: ready });
+    c.add(scene.add.text(left + 100, y + 88, result.ability, { fontFamily: FONT, fontSize: '19px', color: ready ? '#fff3c4' : '#b9a48f' }).setOrigin(0, 0.5));
+    const button = createButton(scene, left + PANEL_WIDTH - 90, y + 49, 130, 66, '만들기', () => this.onCraft(recipe), { fontSize: 24, color: 0xc0392b, enabled: ready });
     c.add(button);
     if (ready) scene.tweens.add({ targets: button, scale: 1.08, duration: 400, yoyo: true, repeat: -1 });
   }
@@ -130,8 +130,8 @@ export default class RecipePanel {
       scene.add
         .text(this.left + 36, y + SMALL_ROW / 2, `${result.emoji} ${result.name} ${'★'.repeat(recipe.stars)}   ${parts}`, {
           fontFamily: EMOJI_FONT,
-          fontSize: '20px',
-          color: '#8a7a6a',
+          fontSize: '22px',
+          color: '#9a8a7a',
         })
         .setOrigin(0, 0.5)
         .setAlpha(0.7),

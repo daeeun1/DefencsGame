@@ -803,7 +803,11 @@ export default class GameScene extends Phaser.Scene {
     if (monster.dead) return;
     const like = this.likeMultiplier(stats.method, monster, stats);
     if (like > 1) this.reaction(monster, Phaser.Utils.Array.GetRandom(['맛있다!', '냠냠!', '최고야!']));
-    else if (like < 1) this.reaction(monster, '이건 별로...');
+    else if (like < 1 && this.time.now - (this.lastDislike ?? -1e9) > 2500) {
+      // 까다로운 손님의 "이건 별로..."는 화면이 어지럽지 않게 가끔만
+      this.lastDislike = this.time.now;
+      this.reaction(monster, '이건 별로...');
+    }
     if (stats.goldPerHit) {
       this.gold += stats.goldPerHit;
       if (Math.random() < 0.3) this.floatText(monster.x + 30, monster.y - 40, `🍤+${stats.goldPerHit}`, COLORS.gold, 18);
@@ -1808,7 +1812,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 웨이브
     const labels = { daily: '🏆 도전', journey: '🗺️ 여정', event: `${this.run.event?.emoji} 이벤트` };
-    this.hudLabel = this.add.text(38, cy - hud.h * 0.22, labels[this.run.kind], { fontFamily: FONT, fontSize: '20px', color: '#9aa4b2' }).setOrigin(0, 0.5);
+    this.hudLabel = this.add.text(38, cy - hud.h * 0.22, labels[this.run.kind], { fontFamily: FONT, fontSize: '22px', color: '#9aa4b2' }).setOrigin(0, 0.5);
     this.hudWave = this.add
       .text(38, cy + hud.h * 0.14, '', { fontFamily: FONT, fontSize: `${Math.round(hud.h * 0.38)}px`, fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0, 0.5);
@@ -1894,6 +1898,7 @@ export default class GameScene extends Phaser.Scene {
       if (this.recipePanel.isOpen) this.recipePanel.close();
       else this.recipePanel.open();
     });
+    this.goldMaxWidth = this.bookButton.x - size / 2 - 10 - this.hudGold.x; // 골드 숫자가 📖 버튼을 덮지 않게
     this.bookBlink = this.tweens.add({ targets: this.bookButton, scale: 1.12, duration: 380, yoyo: true, repeat: -1, paused: true });
 
     // 레일 게이지: 레일 위 주문이 한도에 가까울수록 초록 → 노랑 → 빨강
@@ -1931,7 +1936,10 @@ export default class GameScene extends Phaser.Scene {
     const cache = this.hudCache;
     this.hudWave.setText(`${this.wave}`);
     this.hudWaveTotal.setX(this.hudWave.x + this.hudWave.width + 4);
-    this.hudGold.setText(`${this.gold}`);
+    if (this.hudGold.text !== `${this.gold}`) {
+      this.hudGold.setText(`${this.gold}`).setScale(1);
+      if (this.hudGold.width > this.goldMaxWidth) this.hudGold.setScale(this.goldMaxWidth / this.hudGold.width);
+    }
 
     // 동그라미 타이머 (보스가 있으면 인내심, 빨간색)
     const total = this.boss ? this.bossPatience : WAVE_DURATION;

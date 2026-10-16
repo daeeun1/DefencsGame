@@ -69,7 +69,7 @@ export default class JourneyScene extends Phaser.Scene {
         .map((key) => MONSTERS[key].emoji)
         .join('');
       this.add
-        .text(130, top + 66, `웨이브 ${from}~${from + TOWN_WAVES - 1} · ${guests}`, { fontFamily: EMOJI_FONT, fontSize: '19px', color: dark })
+        .text(130, top + 66, `웨이브 ${from}~${from + TOWN_WAVES - 1} · ${guests}`, { fontFamily: EMOJI_FONT, fontSize: '21px', color: dark })
         .setOrigin(0, 0.5);
       const stars = townStars(i);
       this.add
@@ -80,7 +80,7 @@ export default class JourneyScene extends Phaser.Scene {
         createButton(this, GAME_WIDTH - 130, top + CARD_H / 2, 170, 70, label, () => this.start(i), { fontSize: 22, color: i === 0 ? 0xe85d3a : 0x3f7fd0 });
       } else {
         this.add
-          .text(GAME_WIDTH - 50, top + CARD_H / 2, `동네 ${i}\n보스를 이기면`, { fontFamily: FONT, fontSize: '18px', color: '#8a7a6a', align: 'right' })
+          .text(GAME_WIDTH - 50, top + CARD_H / 2, `동네 ${i}\n보스를 이기면`, { fontFamily: FONT, fontSize: '20px', color: '#8a7a6a', align: 'right' })
           .setOrigin(1, 0.5);
       }
     });

@@ -37,7 +37,7 @@ export default class UpgradePanel {
     const hint = scene.add
       .text(GAME_WIDTH / 2, top + 95, `강화할 때마다 그 줄 요리 양 +${Math.round(LINE_UPGRADE_BONUS * 100)}% (이번 판만)`, {
         fontFamily: FONT,
-        fontSize: '20px',
+        fontSize: '22px',
         color: '#d8c8b4',
       })
       .setOrigin(0.5);

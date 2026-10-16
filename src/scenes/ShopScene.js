@@ -89,13 +89,18 @@ export default class ShopScene extends Phaser.Scene {
       this.tweens.add({ targets: icon, angle: { from: -6, to: 6 }, duration: 600 + i * 120, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
       this.add.text(180, y + 32, box.name, { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0, 0.5);
       this.add
-        .text(180, y + 72, box.desc, { fontFamily: FONT, fontSize: '19px', color: '#d8c8b4', wordWrap: { width: GAME_WIDTH - 230 } })
+        .text(180, y + 72, box.desc, { fontFamily: FONT, fontSize: '21px', color: '#d8c8b4', wordWrap: { width: GAME_WIDTH - 230 } })
         .setOrigin(0, 0.5);
       const info = [];
       if (box.id === 'tool') info.push(odds(TOOL_ODDS));
       if (box.id === 'style') info.push(odds(STYLE_ODDS));
-      if (box.pity) info.push(`전설까지 최대 ${box.pity - (save.pity?.[box.id] ?? 0)}번`);
-      if (info.length) this.add.text(180, y + 106, info.join('  ·  '), { fontFamily: FONT, fontSize: '15px', color: '#b9a48f' }).setOrigin(0, 0.5);
+      if (info.length) this.add.text(180, y + 106, info.join(' · '), { fontFamily: FONT, fontSize: '17px', color: '#b9a48f' }).setOrigin(0, 0.5);
+      // 천장: 버튼 왼쪽에 따로 (한 줄에 다 넣으면 상자 밖으로 넘친다)
+      if (box.pity) {
+        this.add
+          .text(180, y + 150, `🌟 전설까지 최대 ${box.pity - (save.pity?.[box.id] ?? 0)}번`, { fontFamily: FONT, fontSize: '19px', color: COLORS.gold })
+          .setOrigin(0, 0.5);
+      }
       createButton(this, GAME_WIDTH - 150, y + 150, 200, 54, `💰 ${box.cost}`, () => this.open(box.id, 'tips'), {
         fontSize: 24,
         color: box.color,
@@ -203,13 +208,13 @@ export default class ShopScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5);
       this.add
-        .text(115, y + 60, tool ? effectText(toolEffect(tool, level)) : '🎁 도구 상자에서 얻어요', { fontFamily: FONT, fontSize: '19px', color: COLORS.gold })
+        .text(115, y + 60, tool ? effectText(toolEffect(tool, level)) : '🎁 도구 상자에서 얻어요', { fontFamily: FONT, fontSize: '21px', color: COLORS.gold })
         .setOrigin(0, 0.5);
     });
 
     // 아래: 모든 도구 (가진 것은 눌러서 장착)
     const gridTop = TOP + 3 * 96 + 20;
-    this.add.text(30, gridTop, '눌러서 장착 · 같은 도구가 또 나오면 레벨 업', { fontFamily: FONT, fontSize: '20px', color: '#b9a48f' });
+    this.add.text(30, gridTop, '눌러서 장착 · 같은 도구가 또 나오면 레벨 업', { fontFamily: FONT, fontSize: '22px', color: '#b9a48f' });
     const perRow = 5;
     const size = (GAME_WIDTH - 60) / perRow;
     TOOLS.forEach((tool, i) => {
@@ -222,7 +227,7 @@ export default class ShopScene extends Phaser.Scene {
       this.add
         .text(x, y + 60, level ? `${tool.name}\nLv.${level}${level >= TOOL_MAX_LEVEL ? ' MAX' : ''}` : ITEM_TIERS[tool.tier].name, {
           fontFamily: FONT,
-          fontSize: '15px',
+          fontSize: '18px',
           color: level ? COLORS.text : '#8a7a6a',
           align: 'center',
           wordWrap: { width: size - 6, useAdvancedWrap: true },
@@ -290,7 +295,7 @@ export default class ShopScene extends Phaser.Scene {
       const x = 20 + i * cw + cw / 2;
       const on = chip.id === this.styleSlot;
       const bg = this.add.rectangle(x, chipY, cw - 6, 58, on ? 0x8e4fc0 : 0x3d2a1e).setInteractive({ useHandCursor: true });
-      this.add.text(x, chipY, `${chip.emoji}\n${chip.name}`, { fontFamily: FONT, fontSize: '16px', color: on ? COLORS.text : '#b9a48f', align: 'center' }).setOrigin(0.5);
+      this.add.text(x, chipY, `${chip.emoji}\n${chip.name}`, { fontFamily: FONT, fontSize: '19px', color: on ? COLORS.text : '#b9a48f', align: 'center' }).setOrigin(0.5);
       bg.on('pointerup', () => {
         sfx.click();
         this.styleSlot = chip.id;
@@ -319,7 +324,7 @@ export default class ShopScene extends Phaser.Scene {
       this.add
         .text(x, y + 50, have ? item.name : `${theme.emoji} ${ITEM_TIERS[item.tier].name}`, {
           fontFamily: FONT,
-          fontSize: '15px',
+          fontSize: '18px',
           color: have ? COLORS.text : '#8a7a6a',
           align: 'center',
           wordWrap: { width: size - 6, useAdvancedWrap: true },

@@ -123,7 +123,7 @@ export default class CodexScene extends Phaser.Scene {
     if (!owned) {
       const town = TOWNS.findIndex((t) => t.newLine === line);
       this.add.text(x + 18, y + 80, `🔒 동네 ${town + 1}이 열리면`, { fontFamily: FONT, fontSize: '22px', color: '#8a7a6a' }).setOrigin(0, 0.5);
-      this.add.text(x + 18, y + 115, method.role, { fontFamily: FONT, fontSize: '18px', color: '#6a5a4e' }).setOrigin(0, 0.5);
+      this.add.text(x + 18, y + 115, method.role, { fontFamily: FONT, fontSize: '20px', color: '#6a5a4e' }).setOrigin(0, 0.5);
     } else {
       const { level, xp, need } = lineLevelOf(save.lineXp?.[line] ?? 0);
       this.add.text(x + 18, y + 68, `Lv.${level}`, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: COLORS.gold }).setOrigin(0, 0.5);
