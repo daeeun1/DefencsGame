@@ -3,11 +3,11 @@
 //   orderHp     손님 배고픔 배율 (보스 포함)     bossHp     보스 배고픔 배율
 //   orderSpeed  손님 이동 속도 배율               railLimit  식당 자리 (+/-)
 //   startGold   시작 골드 (+/-)                   patience   보스 인내심 초 (+/-)
-//   summonCost  뽑기 비용 배율                    setPower   합작 요리 배율
+//   summonCost  뽑기 비용 배율                    upgradeCost 종류별 강화 비용 배율
 //   tips        판 끝 팁 배율                     orderReward 손님 하나 배부를 때 추가 골드
 
 // 여러 규칙을 하나로 합친다: 배율은 곱하고, 더하기 값은 더하고, 나머지는 뒤의 것으로
-const MULTIPLY = ['orderHp', 'bossHp', 'orderSpeed', 'summonCost', 'setPower', 'tips'];
+const MULTIPLY = ['orderHp', 'bossHp', 'orderSpeed', 'summonCost', 'upgradeCost', 'tips'];
 const ADD = ['railLimit', 'startGold', 'patience', 'orderReward'];
 
 export function mergeRules(rules) {

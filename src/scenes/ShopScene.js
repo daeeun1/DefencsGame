@@ -2,24 +2,22 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, COLORS, FONT, EMOJI_FONT } from '../config.js';
 import { createButton } from '../ui.js';
 import { playMusic, sfx } from '../audio.js';
-import { getSave, writeSave, shopLevel } from '../save.js';
-import { SHOP_ITEMS, shopCost } from '../data/progress.js';
+import { getSave, writeSave } from '../save.js';
 import { METHODS } from '../data/chefs.js';
-import { revealEffect, ring, burst } from '../effects.js';
-import { BOXES, TOOLS, TOOL_SLOTS, TOOL_ODDS, STYLE_ODDS, TOOL_MAX_LEVEL, ITEM_TIERS, openBox, freeBoxReady, buyWithFragments, toolById, toolEffect, effectText } from '../data/items.js';
-import { COSMETICS, COSMETIC_SLOTS, THEMES, FRAGMENT_PRICE, cosmeticById, themeById, isAvailable, themeProgress } from '../data/cosmetics.js';
+import { revealEffect } from '../effects.js';
+import { BOXES, TOOLS, TOOL_SLOTS, TOOL_ODDS, STYLE_ODDS, TOOL_MAX_LEVEL, ITEM_TIERS, openBox, freeBoxReady, toolById, toolEffect, effectText } from '../data/items.js';
+import { COSMETICS, COSMETIC_SLOTS, THEMES, cosmeticById, themeById, isAvailable, themeProgress } from '../data/cosmetics.js';
 import { currentEvent } from '../data/events.js';
 
 const TABS = [
   { id: 'box', label: '🎁 상자' },
   { id: 'tools', label: '🔪 도구' },
   { id: 'style', label: '🎨 꾸미기' },
-  { id: 'upgrade', label: '🏪 강화' },
 ];
 const TOP = 230; // 탭 아래 내용이 시작하는 높이
 
 // 🏪 가게: 팁을 쓰는 곳.
-// 🎁 상자(도구·레시피·꾸미기 뽑기) / 🔪 도구(칼·냄비·옷 장착) / 🎨 꾸미기(모자, 판 바닥) / 🏪 강화(영구 강화)
+// 🎁 상자(도구·레시피·꾸미기 뽑기) / 🔪 도구(칼·냄비·옷 장착) / 🎨 꾸미기
 export default class ShopScene extends Phaser.Scene {
   constructor() {
     super('Shop');
@@ -39,7 +37,7 @@ export default class ShopScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_WIDTH, 120, COLORS.hud).setOrigin(0);
     this.add.text(GAME_WIDTH / 2, 42, '🏪 가게', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5);
     this.add
-      .text(GAME_WIDTH / 2, 92, `🪙 ${save.tips}   🎟️ ${save.coupons ?? 0}   ✨ ${save.fragments ?? 0}`, { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: COLORS.gold })
+      .text(GAME_WIDTH / 2, 92, `🪙 팁 ${save.tips}`, { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: COLORS.gold })
       .setOrigin(0.5);
     const back = this.add.text(24, 60, '←', { fontFamily: FONT, fontSize: '48px', color: COLORS.text }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerup', () => this.scene.start('Title'));
@@ -60,15 +58,14 @@ export default class ShopScene extends Phaser.Scene {
 
     if (this.tab === 'box') this.drawBoxes();
     else if (this.tab === 'tools') this.drawTools();
-    else if (this.tab === 'style') this.drawStyle();
-    else this.drawUpgrades();
+    else this.drawStyle();
   }
 
   // ───────── 🎁 상자 ─────────
 
   drawBoxes() {
     const save = getSave();
-    // 위: 🆓 오늘 무료 꾸미기 상자, 🎟️ 쿠폰 안내
+    // 위: 🆓 오늘 무료 꾸미기 상자
     const free = freeBoxReady();
     const freeButton = createButton(this, GAME_WIDTH / 2, TOP + 32, GAME_WIDTH - 60, 64, free ? '🆓 오늘의 무료 꾸미기 상자 열기!' : '🆓 무료 상자는 내일 또 열려요', () => this.open('style', 'free'), {
       fontSize: 26,
@@ -99,13 +96,11 @@ export default class ShopScene extends Phaser.Scene {
       if (box.id === 'style') info.push(odds(STYLE_ODDS));
       if (box.pity) info.push(`전설까지 최대 ${box.pity - (save.pity?.[box.id] ?? 0)}번`);
       if (info.length) this.add.text(180, y + 106, info.join('  ·  '), { fontFamily: FONT, fontSize: '15px', color: '#b9a48f' }).setOrigin(0, 0.5);
-      const coupon = !box.noCoupon && (save.coupons ?? 0) > 0;
-      createButton(this, GAME_WIDTH - (coupon ? 250 : 150), y + 150, 200, 54, `🪙 ${box.cost}`, () => this.open(box.id, 'tips'), {
+      createButton(this, GAME_WIDTH - 150, y + 150, 200, 54, `🪙 ${box.cost}`, () => this.open(box.id, 'tips'), {
         fontSize: 24,
         color: box.color,
         enabled: save.tips >= box.cost,
       });
-      if (coupon) createButton(this, GAME_WIDTH - 95, y + 150, 110, 54, '🎟️ 1', () => this.open(box.id, 'coupon'), { fontSize: 24, color: 0x3f7fd0 });
     });
   }
 
@@ -158,7 +153,7 @@ export default class ShopScene extends Phaser.Scene {
       title = `[${tier.name}] ${result.item.name}`;
       sub = result.isNew
         ? `✨ 새 ${slot.name}! (${themeById(result.item.theme).emoji} ${themeById(result.item.theme).name} 세트)\n🎨 꾸미기에서 써 보세요`
-        : `이미 가진 꾸미기 → ✨ 조각 +${result.fragments}`;
+        : `이미 가진 꾸미기 → 🪙 팁 ${result.refund} 돌려받기`;
     }
     layer.add(this.add.circle(cx, cy - 60, 110, tier.color, 0.35).setStrokeStyle(8, tier.color));
     const icon = this.add.text(cx, cy - 60, emoji, { fontFamily: EMOJI_FONT, fontSize: '120px' }).setOrigin(0.5).setScale(0);
@@ -280,7 +275,7 @@ export default class ShopScene extends Phaser.Scene {
     }
     const title = THEMES.find((t) => t.id === save.wear.title)?.title;
     this.add
-      .text(GAME_WIDTH / 2, py + 200, title ? `칭호: ${title}` : `✨ 조각 ${save.fragments ?? 0}개 · 모은 꾸미기 ${save.cosmetics.length}/${COSMETICS.length}`, {
+      .text(GAME_WIDTH / 2, py + 200, title ? `칭호: ${title}` : `모은 꾸미기 ${save.cosmetics.length}/${COSMETICS.length}`, {
         fontFamily: FONT,
         fontSize: '22px',
         color: COLORS.gold,
@@ -339,47 +334,9 @@ export default class ShopScene extends Phaser.Scene {
           return this.draw();
         }
         if (!available) return this.toast(`${theme.emoji} ${theme.name} 이벤트 때만 얻을 수 있어요`);
-        this.askBuy(item);
+        this.toast('🎨 꾸미기 상자에서 나와요');
       });
     });
-  }
-
-  // 못 가진 꾸미기를 누르면: ✨ 조각으로 살지 묻는다
-  askBuy(item) {
-    const save = getSave();
-    const price = FRAGMENT_PRICE[item.tier];
-    const cx = GAME_WIDTH / 2;
-    const cy = this.scale.height / 2;
-    const layer = this.add.layer().setDepth(30);
-    layer.add(this.add.rectangle(0, 0, GAME_WIDTH, this.scale.height, 0x000000, 0.75).setOrigin(0).setInteractive());
-    const box = this.add.graphics();
-    box.fillStyle(0x3d2a1e, 1);
-    box.fillRoundedRect(cx - 270, cy - 220, 540, 440, 24);
-    layer.add(box);
-    layer.add(this.add.text(cx, cy - 130, item.emoji, { fontFamily: EMOJI_FONT, fontSize: '90px' }).setOrigin(0.5));
-    layer.add(this.add.text(cx, cy - 40, `[${ITEM_TIERS[item.tier].name}] ${item.name}`, { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5));
-    layer.add(
-      this.add
-        .text(cx, cy + 20, `✨ 조각 ${price}개로 살 수 있어요 (지금 ${save.fragments ?? 0}개)\n상자에서 이미 가진 꾸미기가 나오면 조각이 돼요`, {
-          fontFamily: FONT,
-          fontSize: '20px',
-          color: '#d8c8b4',
-          align: 'center',
-        })
-        .setOrigin(0.5, 0),
-    );
-    const close = () => layer.destroy();
-    layer.add(createButton(this, cx - 120, cy + 150, 200, 80, '닫기', close, { color: 0x7d8594, fontSize: 28 }));
-    layer.add(
-      createButton(this, cx + 120, cy + 150, 220, 80, `✨ ${price} 사기`, () => {
-        if (!buyWithFragments(item.id)) return sfx.denied();
-        sfx.mythic();
-        getSave().wear[item.slot] = item.id;
-        writeSave();
-        close();
-        this.draw();
-      }, { color: 0x8e4fc0, fontSize: 28, enabled: (save.fragments ?? 0) >= price }),
-    );
   }
 
   // 🏅 세트: 테마마다 모은 개수, 다 모으면 칭호를 고를 수 있다
@@ -426,37 +383,5 @@ export default class ShopScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(30);
     this.tweens.add({ targets: t, alpha: 0, delay: 1500, duration: 400, onComplete: () => t.destroy() });
-  }
-
-  // ───────── 🏪 강화 ─────────
-
-  drawUpgrades() {
-    const save = getSave();
-    SHOP_ITEMS.forEach((item, i) => {
-      const y = TOP + i * 170;
-      const lv = shopLevel(item.id);
-      const maxed = lv >= item.max;
-      const cost = shopCost(item, lv);
-      const card = this.add.graphics();
-      card.fillStyle(COLORS.hud, 1);
-      card.fillRoundedRect(30, y, GAME_WIDTH - 60, 150, 20);
-      this.add.text(60, y + 24, `${item.emoji} ${item.name}`, { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: COLORS.text });
-      this.add.text(60, y + 72, `Lv.${lv} / ${item.max}`, { fontFamily: FONT, fontSize: '22px', color: '#d8c8b4' });
-      this.add.text(60, y + 104, maxed ? `${item.effect(lv * item.per)} (최대)` : `${item.effect(lv * item.per)} → ${item.effect((lv + 1) * item.per)}`, {
-        fontFamily: FONT,
-        fontSize: '22px',
-        color: COLORS.gold,
-      });
-      createButton(this, GAME_WIDTH - 140, y + 75, 180, 84, maxed ? 'MAX' : `${cost}팁`, () => {
-        if (maxed || save.tips < cost) return;
-        save.tips -= cost;
-        save.shop[item.id] = lv + 1;
-        writeSave();
-        sfx.coin();
-        ring(this, this.children, GAME_WIDTH - 140, y + 75, 0xffd54f, 60);
-        burst(this, this.children, GAME_WIDTH - 140, y + 75, [0xffd54f, 0xfff8ec], 10);
-        this.time.delayedCall(250, () => this.draw());
-      }, { fontSize: 26, enabled: !maxed && save.tips >= cost });
-    });
   }
 }

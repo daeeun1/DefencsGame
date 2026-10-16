@@ -12,7 +12,7 @@ import { getSave, writeSave } from '../save.js';
 //   orderSpeed   손님 이동 속도 배율
 //   orderReward  손님 하나 배부를 때 추가 골드
 //   orderHp      손님 배고픔 배율 (보스 포함)
-//   setPower     합작 요리 배율
+//   upgradeCost  종류별 강화 비용 배율
 //   tips         판 끝 팁 배율 (특선 기본 보너스에 곱한다)
 
 export const DAILY_TIP_BONUS = 1.5; // 오늘의 도전은 팁을 1.5배 더 준다
@@ -26,7 +26,7 @@ export const DAILY_RULES = [
   { id: 'lucky', emoji: '🍀', name: '행운의 날', desc: '뽑기에서 희귀·영웅이 2배 잘 나와요', rule: { summonOdds: { 1: 80, 2: 18, 3: 2 } } },
   { id: 'sale', emoji: '💸', name: '할인 데이', desc: '뽑기 비용 30% 할인', rule: { summonCost: 0.7 } },
   { id: 'rush', emoji: '🏃', name: '급한 손님', desc: '손님이 25% 빨라지지만 하나에 골드 +1', rule: { orderSpeed: 1.25, orderReward: 1 } },
-  { id: 'combo', emoji: '🍱', name: '합작 데이', desc: '합작 요리가 2배', rule: { setPower: 2 } },
+  { id: 'upgrade_sale', emoji: '⬆️', name: '강화 세일', desc: '종류별 강화 비용 절반', rule: { upgradeCost: 0.5 } },
   { id: 'spicy', emoji: '🌶️', name: '매운맛 도전', desc: '손님 배고픔 20% 증가, 대신 팁 2배', rule: { orderHp: 1.2, tips: 2 } },
 ];
 

@@ -42,7 +42,7 @@ export const TOWNS = [
     waves: 10,
     boss: 'pig',
     bossHp: 1.47,
-    opens: '🍱 합작 요리, 🏆 오늘의 도전',
+    opens: '📖 신화 조합표, ⬆️ 종류별 강화, 🏆 오늘의 도전',
   },
   {
     id: 'forest',
@@ -63,7 +63,7 @@ export const TOWNS = [
     waves: 12,
     boss: 'lion',
     bossHp: 2.0,
-    opens: '📜 레시피 카드, 🍜 면 줄',
+    opens: '💰 팔기, 🍜 면 줄',
     newLine: 'noodle',
   },
   {
@@ -86,7 +86,7 @@ export const TOWNS = [
     waves: 12,
     boss: 'octopus',
     bossHp: 1.65,
-    opens: '🍽️ 풀코스 요리, 🦐 해산물 줄',
+    opens: '🔀 요리 바꾸기, 🦐 해산물 줄',
     newLine: 'sea',
   },
   {
@@ -108,7 +108,7 @@ export const TOWNS = [
     waves: 14,
     boss: 'snowman',
     bossHp: 1.8,
-    opens: '🔥 주방 사고, 🧋 음료 줄',
+    opens: '🎯 판 안 미션, 🔥 주방 사고, 🧋 음료 줄',
     newLine: 'drink',
     gimmicks: { 2: 'sushi_bar', 3: 'chinese', 5: 'blackout', 6: 'sushi_bar', 7: 'chinese', 8: 'blackout', 9: 'chinese' },
   },
@@ -183,11 +183,8 @@ export function bestWave() {
 // 기능 이름 → 몇 번째 동네(1부터)가 열려야 쓸 수 있는지
 export const FEATURE_TOWN = {
   daily: 2, // 🏆 오늘의 도전, 📋 주문서, 랭킹 (동네 1을 깨면)
-  combos: 2, // 🍱 합작 요리
   shop: 1, // 🏪 가게 (처음부터)
-  cards: 3, // 📜 레시피 카드
   deck: 3, // 덱 고르기 (새 줄이 생기면)
-  mythic: 4, // 🍽️ 풀코스 요리
 };
 
 export function hasFeature(name) {

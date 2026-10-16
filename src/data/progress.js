@@ -6,20 +6,6 @@
 export const TIPS_PER_ORDER = 1;
 export const TIPS_PER_STAR = 15;
 
-// ───────── 🏪 가게 강화 ─────────
-
-export const SHOP_ITEMS = [
-  { id: 'startGold', emoji: '💰', name: '넉넉한 금고', per: 20, max: 5, baseCost: 100, effect: (v) => `시작 골드 +${v}` },
-  { id: 'summonDiscount', emoji: '🎲', name: '단골 시장', per: 1, max: 5, baseCost: 150, effect: (v) => `뽑기 비용 -${v}` },
-  { id: 'railCapacity', emoji: '🪑', name: '넓은 식당', per: 5, max: 4, baseCost: 200, effect: (v) => `식당 자리 +${v}` },
-  { id: 'patience', emoji: '☕', name: '웰컴 커피', per: 5, max: 3, baseCost: 250, effect: (v) => `보스 인내심 +${v}초` },
-];
-
-// 다음 레벨로 올리는 비용
-export function shopCost(item, level) {
-  return item.baseCost * (level + 1);
-}
-
 // ───────── 📖 레시피 줄 레벨 ─────────
 // 판을 끝낼 때 덱에 넣은 줄마다 경험치를 받는다. 경험치가 차면 그 줄이 영구히 강해진다 (요리 양 +6%씩).
 

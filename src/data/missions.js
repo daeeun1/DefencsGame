@@ -8,10 +8,9 @@ export const MISSIONS = [
   { id: 'merge', emoji: '🔄', text: '요리 합치기 5번', event: 'merge', target: 5, reward: { free: 2 } },
   { id: 'serve', emoji: '😋', text: '손님 40명 배부르게', event: 'serve', target: 40, reward: { gold: 50 } },
   { id: 'chop', emoji: '🔪', text: '톡 칼질 돕기 15번', event: 'chop', target: 15, reward: { gold: 40 } },
-  { id: 'upgrade', emoji: '⬆️', text: '줄 강화 2번', event: 'upgrade', target: 2, reward: { gold: 60 } },
+  { id: 'upgrade', emoji: '⬆️', text: '종류별 강화 2번', event: 'upgrade', target: 2, reward: { gold: 60 } },
   { id: 'hero', emoji: '🟣', text: '영웅 요리 만들기', event: 'hero', target: 1, reward: { upgrade: 1 } },
-  { id: 'hidden', emoji: '🍳', text: '히든 요리 만들기', event: 'hidden', target: 1, reward: { gold: 120 } },
-  { id: 'combo', emoji: '🍱', text: '합작 요리 5번 던지기', event: 'set', target: 5, reward: { free: 3 }, need: 'combos' },
+  { id: 'mythic', emoji: '📖', text: '신화 요리 만들기', event: 'mythic', target: 1, reward: { gold: 120 } },
   { id: 'swap', emoji: '🔀', text: '요리 바꾸기 2번', event: 'swap', target: 2, reward: { free: 2 } },
   { id: 'legend', emoji: '🌟', text: '전설 요리 만들기', event: 'legend', target: 1, reward: { gold: 150 } },
 ];

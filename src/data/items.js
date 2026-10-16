@@ -5,11 +5,11 @@
 //   effect 종류: speed(모든 칼질 속도 +비율), lineSpeed{줄}, damage(모든 요리 양 +비율), lineDamage{줄},
 //                startGold(시작 골드), hand(손 힘 최대), summonDiscount(뽑기 비용 -), tips(판 끝 팁 +비율)
 // 🎨 꾸미기: data/cosmetics.js
-// 상자는 팁이나 🎟️ 상자 쿠폰(주문서 보상)으로 연다. 하루 한 번 🆓 무료 상자가 있다.
+// 상자는 팁으로 연다. 하루 한 번 🆓 무료 꾸미기 상자가 있다.
 // 천장: 전설이 정해진 횟수 안에 안 나오면 다음 상자는 무조건 전설.
 
 import { getSave, writeSave } from '../save.js';
-import { COSMETICS, FRAGMENTS_FOR_DUPLICATE, FRAGMENT_PRICE, cosmeticById, isAvailable } from './cosmetics.js';
+import { COSMETICS, DUPLICATE_TIPS, cosmeticById, isAvailable } from './cosmetics.js';
 import { currentEvent } from './events.js';
 import { todayKey } from './daily.js';
 
@@ -52,9 +52,9 @@ export const TOOLS = [
 // 🎁 상자
 export const BOXES = [
   { id: 'tool', emoji: '🎁', name: '도구 상자', desc: '칼·냄비·옷 도구. 같은 도구면 레벨 업!', cost: 100, color: 0xe85d3a, pity: 50 },
-  { id: 'style', emoji: '🎨', name: '꾸미기 상자', desc: '모자·바닥·레일·꼬리·배부름 효과. 겹치면 ✨조각', cost: 80, color: 0x8e4fc0, pity: 40 },
+  { id: 'style', emoji: '🎨', name: '꾸미기 상자', desc: '모자·바닥·레일·꼬리·배부름 효과. 겹치면 팁으로', cost: 80, color: 0x8e4fc0, pity: 40 },
   { id: 'recipe', emoji: '📖', name: '레시피 상자', desc: '내 레시피 줄 하나에 경험치 (가끔 대박)', cost: 60, color: 0x3f9a4a },
-  { id: 'golden', emoji: '🌟', name: '황금 꾸미기 상자', desc: '영웅·전설 꾸미기만! (쿠폰으로는 못 열어요)', cost: 1500, color: 0xc99a2e, noCoupon: true },
+  { id: 'golden', emoji: '🌟', name: '황금 꾸미기 상자', desc: '영웅·전설 꾸미기만!', cost: 1500, color: 0xc99a2e, noCoupon: true },
 ];
 
 // 상자에서 나오는 등급 확률
@@ -158,8 +158,8 @@ function rollTier(odds, box, save, rnd) {
   return tier;
 }
 
-// 상자를 연다. pay: 'tips'(팁) / 'coupon'(🎟️ 쿠폰) / 'free'(🆓 오늘 무료). 못 열면 null.
-// 결과: { box, kind, item?, tier, level?, isNew?, fragments?, line?, xp?, big? }
+// 상자를 연다. pay: 'tips'(팁) / 'free'(🆓 오늘 무료). 못 열면 null.
+// 결과: { box, kind, item?, tier, level?, isNew?, refund?, line?, xp?, big? }
 export function openBox(boxId, pay = 'tips', rnd = Math.random) {
   const box = BOXES.find((b) => b.id === boxId);
   const save = getSave();
@@ -167,9 +167,6 @@ export function openBox(boxId, pay = 'tips', rnd = Math.random) {
   if (pay === 'tips') {
     if (save.tips < box.cost) return null;
     save.tips -= box.cost;
-  } else if (pay === 'coupon') {
-    if (box.noCoupon || (save.coupons ?? 0) <= 0) return null;
-    save.coupons -= 1;
   } else if (pay === 'free') {
     if (!freeBoxReady() || box.noCoupon) return null;
     save.freeBox = todayKey();
@@ -197,7 +194,7 @@ export function openBox(boxId, pay = 'tips', rnd = Math.random) {
     save.lineXp[line] = (save.lineXp[line] ?? 0) + roll.xp;
     result = { kind: 'recipe', line, xp: roll.xp, big: Boolean(roll.big), tier: roll.big ? 4 : roll.xp > 30 ? 2 : 1 };
   } else {
-    // 🎨 꾸미기: 등급을 먼저 뽑고, 그 등급에서 지금 얻을 수 있는 것 중 하나 (가진 것도 나온다 → 조각)
+    // 🎨 꾸미기: 등급을 먼저 뽑고, 그 등급에서 지금 얻을 수 있는 것 중 하나 (가진 것도 나온다 → 팁으로)
     const eventId = currentEvent().id;
     const tier = rollTier(box.id === 'golden' ? GOLDEN_ODDS : STYLE_ODDS, box, save, rnd);
     let pool = COSMETICS.filter((c) => c.tier === tier && isAvailable(c, eventId));
@@ -206,28 +203,14 @@ export function openBox(boxId, pay = 'tips', rnd = Math.random) {
     const weighted = pool.map((c) => ({ c, w: save.cosmetics.includes(c.id) ? 1 : 3 }));
     const item = pickWeighted(weighted, rnd).c;
     const isNew = !save.cosmetics.includes(item.id);
-    let fragments = 0;
+    let refund = 0;
     if (isNew) save.cosmetics.push(item.id);
     else {
-      fragments = FRAGMENTS_FOR_DUPLICATE[item.tier];
-      save.fragments = (save.fragments ?? 0) + fragments;
+      refund = DUPLICATE_TIPS[item.tier];
+      save.tips += refund;
     }
-    result = { kind: 'style', item, tier, isNew, fragments };
+    result = { kind: 'style', item, tier, isNew, refund };
   }
   writeSave();
   return { box, ...result };
-}
-
-// ✨ 조각으로 꾸미기 사기. 성공하면 true
-export function buyWithFragments(id) {
-  const save = getSave();
-  const item = cosmeticById(id);
-  if (!item || save.cosmetics?.includes(id) || !isAvailable(item, currentEvent().id)) return false;
-  const price = FRAGMENT_PRICE[item.tier];
-  if ((save.fragments ?? 0) < price) return false;
-  save.fragments -= price;
-  save.cosmetics ??= [];
-  save.cosmetics.push(id);
-  writeSave();
-  return true;
 }

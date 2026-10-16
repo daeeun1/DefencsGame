@@ -24,7 +24,6 @@ export default class Chef extends Phaser.GameObjects.Container {
     this.attackSpeed = 1; // 칼질 속도 배율 (총괄 주방장, 음료, 카드로 올라간다)
     this.freezeTimer = 0; // 디저트 마녀의 레일 정지 타이머
     this.rangeScale = 1; // 사거리 배율 (어두운 칸이면 줄어든다)
-    this.sets = new Set(); // 지금 붙어 있는 합작 요리 id
 
     const tierColor = rankOf(data).color;
 
@@ -74,7 +73,7 @@ export default class Chef extends Phaser.GameObjects.Container {
     scene.tweens.add({ targets: this.body_, scale: 1, duration: 250, ease: 'Back.Out' });
   }
 
-  // ⬆️ 줄 강화 레벨 표시 (요리 왼쪽 위 파란 "+3")
+  // ⬆️ 종류별 강화 레벨 표시 (요리 왼쪽 위 파란 "+3")
   setUpgrade(level) {
     if (!this.upgradeText) {
       if (level <= 0) return;
@@ -84,6 +83,16 @@ export default class Chef extends Phaser.GameObjects.Container {
       this.body_.add(this.upgradeText);
     }
     this.upgradeText.setText(`+${level}`).setVisible(level > 0);
+  }
+
+  // 📖 신화 재료 표시 (요리 오른쪽 아래 작은 점): 실수로 팔거나 합치지 않게
+  setRecipeDot(on) {
+    if (!this.recipeDot) {
+      if (!on) return;
+      this.recipeDot = this.scene.add.text(34, 30, '📖', { fontFamily: EMOJI_FONT, fontSize: '18px' }).setOrigin(0.5);
+      this.body_.add(this.recipeDot);
+    }
+    this.recipeDot.setVisible(on);
   }
 
   get stats() {

@@ -9,13 +9,13 @@
 //   railLimit   식당 자리 (손님이 이만큼 쌓이면 망한다)
 //   gimmick     주방 사고 (없으면 null)
 //   floor       판 바닥 색 두 가지
-//   cardWaves   레시피 카드를 고르는 웨이브
-//   features    이번 판에 쓰는 기능 { combos, cards, mythic }
+//   featuresAt(w) 그 웨이브에 열려 있는 기능 (unlocks.js)
 //   tipBonus    판 끝 팁 배율
 //   rule        특별 규칙 (오늘의 도전 등, rules.js의 mergeRules 형식)
 //   board       랭킹 이름 (없으면 랭킹에 안 올린다)
 
-import { TOWNS, STAGES_PER_TOWN, TOWN_WAVES, hasFeature, townsOpen, townOfWave, bestWave } from './towns.js';
+import { TOWNS, STAGES_PER_TOWN, TOWN_WAVES, townsOpen, townOfWave, bestWave } from './towns.js';
+import { featuresAtReach, accountFeatures, ALL_FEATURES } from './unlocks.js';
 import { monsterMixForWave, RAIL_LIMIT } from './balance.js';
 import { STARTER_LINES } from './chefs.js';
 import { KITCHENS } from './kitchens.js';
@@ -23,11 +23,6 @@ import { todaysSpecial, DAILY_TIP_BONUS } from './daily.js';
 
 // 주방 사고 (data/kitchens.js의 기믹) id → { type, every, duration, ... }
 const GIMMICKS = Object.fromEntries(KITCHENS.filter((k) => k.gimmick).map((k) => [k.id, k.gimmick]));
-
-// 지금 열린 기능
-function features() {
-  return { combos: hasFeature('combos'), cards: hasFeature('cards'), mythic: hasFeature('mythic') };
-}
 
 // ───────── 🗺️ 여정: 한 판으로 쭉 ─────────
 // 웨이브 1~10 빵집 골목, 11~20 마을 시장 … 51~60 화산 바비큐, 61부터는 끝없이.
@@ -70,11 +65,7 @@ export function journeyRun(deck = STARTER_LINES, startTown = 0) {
     floorAt: (wave) => TOWNS[townOfWave(wave)].floor,
     floor: TOWNS[startTown].floor,
     gimmick: null,
-    // 레시피 카드: 21웨이브부터 5웨이브마다 (21, 26, 31 …)
-    cardAt: (wave) => reach(wave) >= 21 && wave >= 21 && wave % 5 === 1,
-    cardWaves: [],
-    featuresAt: (wave) => ({ combos: reach(wave) >= 11, cards: reach(wave) >= 21, mythic: reach(wave) >= 31 }),
-    features: { combos: reach(startWave) >= 11, cards: reach(startWave) >= 21, mythic: reach(startWave) >= 31 },
+    featuresAt: (wave) => featuresAtReach(reach(wave)),
     tipBonus: 0.5,
     tipAt: (wave) => 0.5 + 0.1 * townOfWave(wave),
     deck,
@@ -130,8 +121,7 @@ export function dailyRun() {
     railLimit: RAIL_LIMIT - 10,
     gimmick: daily.kitchen.gimmick,
     floor: daily.kitchen.floor,
-    cardWaves: [6, 11, 16, 21, 26],
-    features: { combos: true, cards: true, mythic: false },
+    featuresAt: () => ALL_FEATURES,
     tipBonus: DAILY_TIP_BONUS * 1.5,
     deck: STARTER_LINES,
     rule: daily.special.rule,
@@ -165,8 +155,7 @@ export function eventRun(event, deck = STARTER_LINES) {
     railLimit: 40,
     gimmick: null,
     floor: t.floor,
-    cardWaves: [4, 8, 12],
-    features: features(),
+    featuresAt: () => accountFeatures(),
     tipBonus: 1.5 + town * 0.25,
     deck,
     rule: event.rule ?? {},

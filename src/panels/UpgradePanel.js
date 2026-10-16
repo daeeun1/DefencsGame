@@ -32,7 +32,7 @@ export default class UpgradePanel {
     box.strokeRoundedRect(left, top, PANEL_WIDTH, panelHeight, 24);
     const blocker = scene.add.rectangle(left, top, PANEL_WIDTH, panelHeight, 0, 0).setOrigin(0).setInteractive();
     const title = scene.add
-      .text(GAME_WIDTH / 2, top + 50, '⬆️ 줄 강화', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: COLORS.text })
+      .text(GAME_WIDTH / 2, top + 50, '⬆️ 종류별 강화', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: COLORS.text })
       .setOrigin(0.5);
     const hint = scene.add
       .text(GAME_WIDTH / 2, top + 95, `강화할 때마다 그 줄 요리 양 +${Math.round(LINE_UPGRADE_BONUS * 100)}% (이번 판만)`, {

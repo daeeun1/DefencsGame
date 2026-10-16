@@ -38,18 +38,17 @@ src/
   data/
     balance.js        웨이브 길이, 배고픔 증가율, 뽑기 비용, 손 힘 같은 밸런스 숫자
     monsters.js       🐭 몬스터 손님과 보스 손님
-    chefs.js          레시피 줄 8개의 요리 목록, 등급, 칼질 횟수, 🍳 히든 요리 24개
-    sets.js           🍱 합작 요리
+    chefs.js          레시피 줄 8개의 요리 목록, 등급, 칼질 횟수, 📖 신화 요리 8개와 조합표
+    unlocks.js        🔓 계정 기준으로 하나씩 열리는 판 안 기능 (W10, 11, 16, 21, 31, 41)
     towns.js          🗺️ 동네 6개, 여정 진행(최고 웨이브, 동네 별), 기능이 열리는 동네
     runs.js           한 판의 설정 (여정, 오늘의 도전, 이벤트)
     missions.js       🎯 판 안 미션
     progress.js       판 끝 보상, 가게 강화, 줄 레벨, 랭킹 점수
-    cards.js          📜 레시피 카드
     daily.js          🏆 오늘의 도전 (같은 운, 하루 3번)
     quests.js         📋 오늘의 주문서
     events.js         🎉 2주 이벤트
-    items.js          🎁 상자(천장, 쿠폰, 무료 상자), 🔪 주방 도구
-    cosmetics.js      🎨 꾸미기 42개와 세트, 조각
+    items.js          🎁 상자(천장, 무료 상자), 🔪 주방 도구
+    cosmetics.js      🎨 꾸미기 42개와 세트, 겹치면 돌려받는 팁
     rules.js          특별 규칙 합치기
     kitchens.js       주방 사고(불, 정전, 빠른 레일) 목록
   objects/
@@ -58,8 +57,8 @@ src/
     Chef.js           소환진 위에서 칼질하고 요리를 던지는 요리 하나
     Projectile.js     포물선으로 날아가는 요리
   panels/
-    RecipePanel.js    🍳 히든 요리 조합표와 합작 요리 안내 창
-    UpgradePanel.js   ⬆️ 줄 강화 창
+    RecipePanel.js    📖 신화 조합표 (아래에서 반쯤 올라오는 판)
+    UpgradePanel.js   ⬆️ 종류별 강화 창
   art/                산타 모자 도트 그림
   scenes/
     BootScene.js      가장 먼저 열려서 그림을 준비

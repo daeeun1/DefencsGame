@@ -14,7 +14,6 @@ function defaultSave() {
     deck: [...STARTER_LINES], // 판에 가져가는 4줄
     lineXp: {}, // 줄별 경험치 { cut: 120 }
     seen: [], // 한 번 본 안내 { 'combos', ... }
-    shop: {}, // 가게 강화 레벨 { startGold: 1 }
     codex: {}, // (예전) 유닛별 도감 레벨. 줄 레벨로 옮긴다
     discovered: [], // 한 번이라도 만난 요리사 id 목록
     runs: 0, // 플레이한 판 수
@@ -48,6 +47,18 @@ function migrateLegacyIds(save) {
     }
   }
   save.discovered = [...new Set(save.discovered.map((id) => LEGACY_IDS[id] ?? id))];
+
+  // 🏪 가게 강화는 없어졌다: 쓴 팁을 그대로 돌려준다 (예전 값: 기본 비용 × 레벨)
+  const SHOP_BASE = { startGold: 100, summonDiscount: 150, railCapacity: 200, patience: 250 };
+  for (const [id, level] of Object.entries(save.shop ?? {})) {
+    for (let lv = 0; lv < level; lv++) save.tips += (SHOP_BASE[id] ?? 0) * (lv + 1);
+  }
+  save.shop = {};
+
+  // 🎟️ 쿠폰, ✨ 조각도 없어졌다: 팁으로 바꿔 준다 (쿠폰 1장 = 80팁, 조각 1개 = 4팁)
+  save.tips += (save.coupons ?? 0) * 80 + (save.fragments ?? 0) * 4;
+  save.coupons = 0;
+  save.fragments = 0;
 
   // 예전 유닛별 도감 레벨 → 레시피 줄 레벨 (그 줄에서 가장 높은 도감 레벨만큼)
   if (!save.codexMoved) {
@@ -92,9 +103,6 @@ export function totalStars() {
   return Object.values(getSave().stages ?? {}).reduce((sum, n) => sum + n, 0);
 }
 
-export function shopLevel(id) {
-  return getSave().shop[id] ?? 0;
-}
 
 // 레시피 줄 레벨 (경험치로 계산)
 export function lineLevel(line) {

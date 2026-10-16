@@ -248,81 +248,54 @@ function chef(id, name, emoji, tier, method, extra = {}) {
   return { ...stats, ...extra };
 }
 
-// ───────── 🍳 히든 요리 (원피스 랜덤 디펜스의 히든 조합처럼) ─────────
-// 판 위에 정해진 재료 요리가 모두 있으면 만들 수 있다. 재료는 사라지고 그 자리에 히든 요리가 생긴다.
-// 힘(요리 양 배율) = 재료 등급 배율의 합 × HIDDEN_BONUS. 그래서 만들면 항상 조금 이득이다.
-// 등급: 🟢 히든 / 🔵 특별 / 🔴 풀코스 (풀코스는 동네 4부터)
+// ───────── 📖 신화 요리 (조합표대로 만든다) ─────────
+// 판 위에 정해진 재료 요리가 모두 있으면 만들 수 있다. 재료는 사라지고 그 자리에 신화 요리가 생긴다.
+// 신화 하나에 요리 종류 2개. 8줄이 동그랗게 이어지게 짝지었다 (줄마다 신화 2개에 들어간다):
+//   빵 → 디저트 → 튀김 → 음료 → 국물 → 면 → 해산물 → 고기 → (다시 빵)
+// 힘(요리 양 배율) = 재료 등급 배율의 합 × MYTHIC_BONUS. 그래서 만들면 항상 조금 이득이다.
+// 어려움: ★ 영웅 2개 / ★★ 전설 1 + 영웅 1 / ★★★ 재료 3개
 
-export const HIDDEN_BONUS = 1.3;
+export const MYTHIC_BONUS = 1.3;
 
-export const HIDDEN_GRADES = {
-  hidden: { name: '히든', color: 0x2ecc71 },
-  special: { name: '특별', color: 0x1abc9c },
-  fullcourse: { name: '풀코스', color: 0xe74c3c },
-};
-
-// 등급 이름과 색 (히든 요리면 히든 등급, 아니면 일반~신화)
+// 등급 이름과 색
 export function rankOf(data) {
-  return data.grade ? HIDDEN_GRADES[data.grade] : TIERS[data.tier];
+  return TIERS[data.tier];
 }
 
-// 히든 요리 하나: 재료 id 목록으로 힘을 계산한다
-function hidden(id, name, emoji, grade, method, ingredients, extra = {}) {
-  const power = ingredients.reduce((sum, ing) => sum + TIERS[chefById(ing).tier].damage, 0) * HIDDEN_BONUS;
+// 신화 하나: 재료 id 목록으로 힘을 계산한다
+function mythic(id, name, emoji, method, stars, ingredients, ability, extra = {}) {
+  const power = ingredients.reduce((sum, ing) => sum + TIERS[chefById(ing).tier].damage, 0) * MYTHIC_BONUS;
   const base = METHODS[method];
   const stats = chef(id, name, emoji, 5, method, extra);
   stats.damage = Math.round(base.damage * power);
   if (base.dot && !extra.dot) stats.dot = { dps: base.dot.dps * power, duration: base.dot.duration };
-  stats.grade = grade;
-  stats.ingredients = ingredients;
-  return stats;
+  return { ...stats, mythic: true, stars, ingredients, ability };
 }
 
-const HIDDEN = [
-  // 🟢 히든 (희귀·일반 재료)
-  hidden('taco', '타코', '🌮', 'hidden', 'cut', ['dough', 'firewood'], { pierce: { count: 2, radius: 140 }, ability: '한 번에 2명씩' }),
-  hidden('onigiri', '주먹밥', '🍙', 'hidden', 'cut', ['flour', 'veggie_prep', 'egg'], { interval: 0.4, ability: '아주 빠르게' }),
-  hidden('dumpling', '만두', '🥟', 'hidden', 'boil', ['dough', 'veggie_prep', 'chicken_prep'], { ability: '뜨거움 오래' }),
-  hidden('fried_egg', '계란프라이', '🍳', 'hidden', 'grill', ['egg', 'chicken_prep'], { splash: 80 }),
-  hidden('waffle', '와플', '🧇', 'hidden', 'chill', ['dough', 'whipped_cream'], { slow: { factor: 0.45, duration: 2 } }),
-  hidden('udon', '우동', '🍜', 'hidden', 'boil', ['broth', 'dough'], { pierce: { count: 3, radius: 150 }, ability: '줄줄이 뜨겁게' }),
-  hidden('dango', '경단', '🍡', 'hidden', 'chill', ['whipped_cream', 'egg', 'flour'], { slow: { factor: 0.4, duration: 2.2 } }),
-  hidden('hotdog', '핫도그', '🌭', 'hidden', 'grill', ['firewood', 'flour'], { splash: 90 }),
-  // 🔵 특별 (영웅 재료)
-  hidden('pizza', '피자', '🍕', 'special', 'grill', ['bread_loaf', 'drumstick', 'spice'], { splash: 130, ability: '넓게 펑!' }),
-  hidden('curry', '카레', '🍛', 'special', 'boil', ['spice', 'drumstick', 'flour'], { dot: { dps: 60, duration: 4 }, ability: '아주 뜨거움' }),
-  hidden('pie', '파이', '🥧', 'special', 'chill', ['bread_loaf', 'strawberry'], { splash: 80, slow: { factor: 0.4, duration: 2 }, ability: '주변까지 멈칫' }),
-  hidden('soft_cone', '소프트콘', '🍦', 'special', 'chill', ['strawberry', 'whipped_cream'], {
-    slow: { factor: 0.35, duration: 2.2 },
-    freeze: { every: 15, duration: 1.5 },
-    ability: '15초마다 레일 1.5초 정지',
+const MYTHICS = [
+  mythic('burger', '산더미 버거', '🍔', 'cut', 1, ['bread_loaf', 'drumstick'], '주변 3명도 같이 냠!', { pierce: { count: 4, radius: 170 } }),
+  mythic('crown_cupcake', '왕관 컵케이크', '🧁', 'chill', 1, ['bread_loaf', 'strawberry'], '이걸로 배부른 손님은 골드 +50%', { goldBonus: 0.5 }),
+  mythic('cloud_cake', '구름 케이크', '🍰', 'chill', 2, ['cake', 'shrimp_fry'], '3번에 1번, 손님이 1초 꾸벅 멈춤', {
+    stun: { every: 3, duration: 1 },
+    slow: { factor: 0.4, duration: 2 },
   }),
-  hidden('army_stew', '부대찌개', '🥘', 'special', 'boil', ['spice', 'firewood', 'broth'], { splash: 100, ability: '주변까지 뜨겁게' }),
-  hidden('galbi', '갈비찜', '🍖', 'special', 'grill', ['drumstick', 'broth'], { splash: 110 }),
-  hidden('burrito', '부리또', '🌯', 'special', 'cut', ['bread_loaf', 'drumstick', 'veggie_prep'], { pierce: { count: 3, radius: 170 }, ability: '한 번에 3명씩' }),
-  // 🔵 특별 (새 레시피 줄 재료)
-  hidden('sushi_roll', '초밥 롤', '🍣', 'special', 'sea', ['squid', 'dough'], { range: 480 }),
-  hidden('seafood_pasta', '해물 파스타', '🍝', 'special', 'noodle', ['spaghetti', 'crab'], { pierce: { count: 5, radius: 200 } }),
-  hidden('dessert_cafe', '디저트 카페', '🍮', 'special', 'drink', ['latte', 'strawberry'], { cheer: { attackSpeed: 0.4 }, ability: '옆 요리 칼질 +40%' }),
-  hidden('fried_chicken', '치킨', '🍗', 'special', 'fry', ['fries', 'drumstick'], { goldPerHit: 3, ability: '맞힐 때마다 골드 3' }),
-  // 🔴 풀코스 (전설 재료)
-  hidden('cooking_god', '요리의 신', '🌟', 'fullcourse', 'all', ['sandwich', 'whole_bbq', 'head_chef'], { range: 270 }),
-  hidden('dessert_witch', '시간을 멈추는 디저트 마녀', '🧁', 'fullcourse', 'chill', ['cake', 'hotpot', 'head_chef'], {
-    range: 270,
-    slow: { factor: 0.3, duration: 2.5 },
-    freeze: { every: 12, duration: 2.5 },
-    ability: '12초마다 레일 전체 2.5초 정지',
-  }),
-  hidden('set_meal', '한상 정식', '🍱', 'fullcourse', 'all', ['bread_loaf', 'drumstick', 'strawberry', 'spice'], { range: 260, ability: '모든 손님이 좋아함' }),
-  hidden('wedding_cake', '웨딩 케이크', '🎂', 'fullcourse', 'chill', ['cake', 'whipped_cream', 'strawberry'], {
-    range: 280,
-    slow: { factor: 0.25, duration: 3 },
-    freeze: { every: 10, duration: 2 },
-    ability: '10초마다 레일 2초 정지',
-  }),
-  hidden('roast_turkey', '칠면조 구이', '🦃', 'fullcourse', 'grill', ['whole_bbq', 'bread_loaf', 'spice'], { splash: 160, range: 260, ability: '아주 넓게 펑!' }),
+  mythic('rainbow_juice', '무지개 주스', '🍹', 'drink', 2, ['fry_platter', 'latte'], '옆 요리 칼질 +50%', { cheer: { attackSpeed: 0.5 } }),
+  mythic('forest_tea', '숲속 보약차', '🍵', 'boil', 1, ['latte', 'spice'], '레일 위 모든 손님이 15% 느려짐', { railSlow: 0.15 }),
+  mythic('endless_noodle', '끝없는 국수', '🍜', 'noodle', 2, ['ramen', 'spice'], '줄줄이 8명까지 관통', { pierce: { count: 8, radius: 240 } }),
+  mythic('seafood_hotpot', '해물 전골', '🍲', 'sea', 3, ['lobster', 'ramen', 'spaghetti'], '모든 손님이 좋아함 (항상 2배)', { alwaysLiked: true }),
+  mythic('royal_dosirak', '산해진미 도시락', '🍱', 'grill', 3, ['whole_bbq', 'lobster', 'drumstick'], '보스에게 3배', { bossBonus: 3, splash: 120 }),
 ];
-CHEFS.push(...HIDDEN);
+CHEFS.push(...MYTHICS);
 
-// 히든 요리 레시피 목록 (판 위에 재료가 모두 있으면 만들 수 있다)
-export const RECIPES = HIDDEN.map((h) => ({ result: h.id, ingredients: h.ingredients, grade: h.grade }));
+// 신화 조합표 (판 위에 재료가 모두 있으면 만들 수 있다)
+export const RECIPES = MYTHICS.map((m) => ({ result: m.id, ingredients: m.ingredients, stars: m.stars }));
+
+// 그 요리가 재료로 들어가는 신화 목록
+export function mythicsUsing(id) {
+  return MYTHICS.filter((m) => m.ingredients.includes(id));
+}
+
+// 이 덱(4줄)으로 만들 수 있는 신화인지
+export function recipeFitsDeck(recipe, deck) {
+  return recipe.ingredients.every((id) => deck.includes(chefById(id).method));
+}

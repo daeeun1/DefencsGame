@@ -44,12 +44,19 @@ export default class CodexScene extends Phaser.Scene {
       return this.drawLineCard(line, x, y);
     });
 
-    // ✨ 특별·히든 요리 (총괄 주방장, 히든 조합, 비밀)
+    // 📖 신화 도감: 아직 못 만든 신화는 까만 실루엣으로 보인다. 그 밖의 특별 요리(총괄 주방장, 비밀)는 옆에
     const specialY = top + 4 * (CARD_H + GAP) + 6;
-    const specials = CHEFS.filter((c) => c.special || c.hidden || c.grade);
-    const foundSpecial = specials.filter((c) => isDiscovered(c.id)).length;
-    this.add.text(left, specialY, `✨ 특별·히든 요리 ${foundSpecial}/${specials.length}`, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: COLORS.gold });
-    const perRow = 9;
+    const mythics = CHEFS.filter((c) => c.mythic);
+    const others = CHEFS.filter((c) => c.special || c.hidden);
+    const specials = [...mythics, ...others];
+    const madeMythics = mythics.filter((c) => isDiscovered(c.id)).length;
+    this.add.text(left, specialY, `📖 신화 ${madeMythics}/${mythics.length}  ·  ✨ 특별 ${others.filter((c) => isDiscovered(c.id)).length}/${others.length}`, {
+      fontFamily: FONT,
+      fontSize: '22px',
+      fontStyle: 'bold',
+      color: COLORS.gold,
+    });
+    const perRow = 10;
     const step = (GAME_WIDTH - 2 * left) / perRow;
     specials.forEach((chef, i) => {
       const x = left + step / 2 + (i % perRow) * step;
@@ -57,14 +64,19 @@ export default class CodexScene extends Phaser.Scene {
       const seen = isDiscovered(chef.id);
       const rank = rankOf(chef);
       this.add.circle(x, y, 28, seen ? rank.color : 0x5a4a3e).setStrokeStyle(3, 0x2b1d14);
-      const icon = this.add
-        .text(x, y, seen ? chef.emoji : '?', { fontFamily: seen ? EMOJI_FONT : FONT, fontSize: '30px', fontStyle: 'bold', color: '#b9a48f' })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
+      // 신화는 못 만들어도 모양(실루엣)은 보인다
+      const icon = chef.mythic || seen
+        ? this.add.text(x, y, chef.emoji, { fontFamily: EMOJI_FONT, fontSize: '30px' }).setOrigin(0.5)
+        : this.add.text(x, y, '?', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#b9a48f' }).setOrigin(0.5);
+      if (!seen && chef.mythic) icon.setTint(0x000000).setAlpha(0.75);
+      icon.setInteractive({ useHandCursor: true });
       const recipe = chef.ingredients ? `\n재료: ${chef.ingredients.map((id) => CHEFS.find((c) => c.id === id).emoji).join(' + ')}` : '';
-      icon.on('pointerup', () =>
-        this.showDetail(seen ? `[${rank.name}] ${chef.emoji} ${chef.name}\n${chef.ability ?? METHODS[chef.method].role}${recipe}` : `❓ 아직 만나지 못한 ${rank.name} 요리예요`),
-      );
+      const stars = chef.stars ? ` ${'★'.repeat(chef.stars)}` : '';
+      icon.on('pointerup', () => {
+        if (seen) this.showDetail(`[${rank.name}] ${chef.emoji} ${chef.name}${stars}\n${chef.ability ?? METHODS[chef.method].role}${recipe}`);
+        else if (chef.mythic) this.showDetail(`[신화] ??? ${stars}\n아직 못 만들었어요. 판에서 📖를 눌러 보세요${recipe}`);
+        else this.showDetail(`❓ 아직 만나지 못한 ${rank.name} 요리예요`);
+      });
     });
     const specialRows = Math.ceil(specials.length / perRow);
 

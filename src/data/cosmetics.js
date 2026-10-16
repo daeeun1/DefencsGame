@@ -1,5 +1,4 @@
-// 🎨 꾸미기: 강해지지는 않고 모양만 바뀐다. 상자에서 나오고, 같은 게 또 나오면 ✨ 꾸미기 조각이 된다.
-// 조각으로 갖고 싶은 꾸미기를 골라 살 수 있다.
+// 🎨 꾸미기: 강해지지는 않고 모양만 바뀐다. 상자에서 나오고, 같은 게 또 나오면 팁으로 돌려받는다.
 //
 // 칸 5개
 //   hat    요리 위 모자 (emoji)
@@ -84,9 +83,8 @@ export const COSMETICS = [
   item('firework_pop', 'feed', 'golden', 4, '폭죽', '🎉', { emojis: ['🎉', '🎊', '✨'] }),
 ];
 
-// 같은 꾸미기가 또 나오면 받는 조각, 조각으로 살 때 값 (등급별)
-export const FRAGMENTS_FOR_DUPLICATE = { 1: 5, 2: 10, 3: 20, 4: 50 };
-export const FRAGMENT_PRICE = { 1: 30, 2: 60, 3: 120, 4: 300 };
+// 같은 꾸미기가 또 나오면 돌려받는 팁 (등급별)
+export const DUPLICATE_TIPS = { 1: 20, 2: 40, 3: 80, 4: 200 };
 
 export function cosmeticById(id) {
   return COSMETICS.find((c) => c.id === id);

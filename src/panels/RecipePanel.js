@@ -1,36 +1,27 @@
 import { GAME_WIDTH, COLORS, FONT, EMOJI_FONT } from '../config.js';
-import { METHODS, RECIPES, HIDDEN_GRADES, chefById } from '../data/chefs.js';
+import { RECIPES, chefById, recipeFitsDeck } from '../data/chefs.js';
 import { createButton } from '../ui.js';
-import { SETS, LUNCHBOX } from '../data/sets.js';
 import { isDiscovered } from '../save.js';
 import { sfx } from '../audio.js';
 
-const PANEL_WIDTH = 680;
-const ROW_HEIGHT = 112;
-const PER_PAGE = 6;
+const PANEL_WIDTH = GAME_WIDTH - 24;
+const BIG_ROW = 100; // 이 덱으로 만들 수 있는 신화
+const SMALL_ROW = 50; // 이 덱으로는 못 만드는 신화 (흐리게)
 
-// 📜 레시피 창: 🍳 히든 요리 조합표와 🍱 합작 요리 안내.
-// 히든 요리는 한 번 만들기 전에는 이름이 ???이고, 판 위에 없는 재료는 ❓로 가려진다 (힌트).
-// 이번 덱으로 만들 수 있는 레시피만 보여 주고, 지금 만들 수 있는 것이 맨 위에 온다.
+// 📖 신화 조합표: 아래에서 반쯤 올라오는 판. 열려 있는 동안 게임은 느려진다 (GameScene).
+// 덱으로 만들 수 있는 신화가 위에 크게, 못 만드는 건 아래에 흐리게.
+// 재료가 판 위에 있으면 ✅, 없으면 ⬜. 다 모이면 줄이 금색이 되고 [만들기] 버튼이 켜진다.
 export default class RecipePanel {
-  // deck: 이번 판 덱, hasChef(id): 판 위에 그 요리가 있는지, isUnlocked(recipe): 이 등급을 쓸 수 있는지
-  // onCraft(recipe): 만들기 버튼
-  constructor(scene, { deck, hasChef, isUnlocked, onCraft }) {
+  // deck: 이번 판 덱, hasChef(id): 판 위에 그 요리가 있는지, onCraft(recipe): 만들기 버튼
+  constructor(scene, { deck, hasChef, onCraft }) {
     this.scene = scene;
     this.hasChef = hasChef;
-    this.isUnlocked = isUnlocked;
     this.onCraft = onCraft;
-    this.deck = deck;
-    this.tab = 'hidden';
-    this.page = 0;
-    // 덱에 없는 줄의 재료가 들어간 레시피는 빼고 보여 준다
-    const lines = new Set([...deck, 'buff']);
-    this.recipes = RECIPES.filter((r) => r.ingredients.every((id) => lines.has(chefById(id).method)));
-
-    const h = scene.scale.height;
-    this.panelHeight = 160 + PER_PAGE * ROW_HEIGHT + 120;
-    this.top = (h - this.panelHeight) / 2;
-    this.left = (GAME_WIDTH - PANEL_WIDTH) / 2;
+    this.fit = RECIPES.filter((r) => recipeFitsDeck(r, deck)).sort((a, b) => a.stars - b.stars);
+    this.other = RECIPES.filter((r) => !recipeFitsDeck(r, deck));
+    this.panelHeight = 150 + this.fit.length * BIG_ROW + (this.other.length ? 40 + this.other.length * SMALL_ROW : 0);
+    this.top = scene.scale.height - this.panelHeight - 12;
+    this.left = 12;
     this.container = scene.add.container(0, 0).setDepth(20).setVisible(false);
   }
 
@@ -39,9 +30,11 @@ export default class RecipePanel {
   }
 
   open() {
-    this.page = 0;
+    sfx.click();
     this.container.setVisible(true);
     this.draw();
+    this.container.y = this.panelHeight;
+    this.scene.tweens.add({ targets: this.container, y: 0, duration: 220, ease: 'Back.Out' });
   }
 
   close() {
@@ -51,130 +44,97 @@ export default class RecipePanel {
 
   // 판 위 요리가 바뀌면 다시 그린다 (창이 열려 있는 동안 GameScene이 부른다)
   refresh() {
-    const key = this.recipes.map((r) => this.state(r).ready).join('');
-    if (key !== this.lastKey) this.draw();
+    if (this.key() !== this.lastKey) this.draw();
   }
 
-  state(recipe) {
-    const have = recipe.ingredients.map((id) => this.hasChef(id));
-    return { have, ready: have.every(Boolean) && this.isUnlocked(recipe), known: isDiscovered(recipe.result) };
+  key() {
+    return this.fit.map((r) => r.ingredients.map((id) => (this.hasChef(id) ? 1 : 0)).join('')).join('|');
   }
 
   draw() {
     const scene = this.scene;
     const c = this.container;
     c.removeAll(true);
-    this.lastKey = this.recipes.map((r) => this.state(r).ready).join('');
+    this.lastKey = this.key();
     const { left, top, panelHeight } = this;
-    const shade = scene.add.rectangle(0, 0, GAME_WIDTH, scene.scale.height, 0x000000, 0.6).setOrigin(0).setInteractive();
+    // 위쪽 빈 곳을 누르면 닫힌다 (판은 그대로 보인다)
+    const shade = scene.add.rectangle(0, 0, GAME_WIDTH, top, 0x000000, 0.25).setOrigin(0).setInteractive();
     shade.on('pointerup', () => this.close());
     const box = scene.add.graphics();
-    box.fillStyle(COLORS.hud, 1);
+    box.fillStyle(COLORS.hud, 0.97);
     box.fillRoundedRect(left, top, PANEL_WIDTH, panelHeight, 24);
-    box.lineStyle(4, 0x2ecc71, 1);
+    box.lineStyle(4, 0xe74c3c, 1);
     box.strokeRoundedRect(left, top, PANEL_WIDTH, panelHeight, 24);
     c.add([shade, box, scene.add.rectangle(left, top, PANEL_WIDTH, panelHeight, 0, 0).setOrigin(0).setInteractive()]);
 
-    // 탭
-    [
-      { id: 'hidden', label: '🍳 히든 요리' },
-      { id: 'combo', label: '🍱 합작 요리' },
-    ].forEach((tab, i) => {
-      const x = left + PANEL_WIDTH / 4 + (i * PANEL_WIDTH) / 2;
-      const on = this.tab === tab.id;
-      const bg = scene.add.rectangle(x, top + 50, PANEL_WIDTH / 2 - 30, 64, on ? 0x2e8b57 : 0x2b1d14).setInteractive({ useHandCursor: true });
-      bg.on('pointerup', () => {
-        sfx.click();
-        this.tab = tab.id;
-        this.page = 0;
-        this.draw();
-      });
-      c.add([bg, scene.add.text(x, top + 50, tab.label, { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: on ? COLORS.text : '#b9a48f' }).setOrigin(0.5)]);
-    });
-
-    if (this.tab === 'hidden') this.drawHidden();
-    else this.drawCombos();
-    c.add(createButton(scene, GAME_WIDTH / 2, top + panelHeight - 55, 220, 76, '닫기', () => this.close(), { fontSize: 28, color: 0x7d8594 }));
-  }
-
-  drawHidden() {
-    const scene = this.scene;
-    const c = this.container;
-    const { left, top } = this;
-    // 지금 만들 수 있는 것 → 한 번 만든 것 → 모르는 것 순서
-    const list = this.recipes
-      .map((recipe) => ({ recipe, ...this.state(recipe) }))
-      .sort((a, b) => Number(b.ready) - Number(a.ready) || Number(b.known) - Number(a.known));
-    const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-    this.page = Math.min(this.page, pages - 1);
-    const found = list.filter((r) => r.known).length;
+    c.add(scene.add.text(left + 28, top + 40, '📖 신화 조합표', { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0, 0.5));
     c.add(
       scene.add
-        .text(GAME_WIDTH / 2, top + 108, `이 덱으로 만들 수 있는 히든 ${list.length}개 · 발견 ${found}개`, { fontFamily: FONT, fontSize: '20px', color: '#d8c8b4' })
-        .setOrigin(0.5),
+        .text(left + 28, top + 82, '재료 요리를 판에 모으면 만들 수 있어요 (게임이 느려져요)', { fontFamily: FONT, fontSize: '18px', color: '#d8c8b4' })
+        .setOrigin(0, 0.5),
     );
+    c.add(createButton(scene, left + PANEL_WIDTH - 70, top + 44, 100, 60, '닫기', () => this.close(), { fontSize: 22, color: 0x7d8594 }));
 
-    list.slice(this.page * PER_PAGE, (this.page + 1) * PER_PAGE).forEach(({ recipe, have, ready, known }, i) => {
-      const y = top + 140 + i * ROW_HEIGHT;
-      const result = chefById(recipe.result);
-      const grade = HIDDEN_GRADES[recipe.grade];
-      const g = scene.add.graphics();
-      g.fillStyle(ready ? 0x2e5a3a : 0x2b1d14, 1);
-      g.fillRoundedRect(left + 16, y, PANEL_WIDTH - 32, ROW_HEIGHT - 10, 16);
-      c.add(g);
-      c.add(scene.add.circle(left + 66, y + 51, 36, grade.color, known ? 0.9 : 0.35).setStrokeStyle(3, 0x14171c));
-      c.add(scene.add.text(left + 66, y + 51, known ? result.emoji : '❓', { fontFamily: EMOJI_FONT, fontSize: '40px' }).setOrigin(0.5));
-      const title = known ? `${result.name}` : '???';
-      c.add(
-        scene.add
-          .text(left + 116, y + 26, `[${grade.name}] ${title}`, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#' + grade.color.toString(16).padStart(6, '0') })
-          .setOrigin(0, 0.5),
-      );
-      // 재료: 있으면 ✅, 모르는 레시피에서 판 위에 없는 재료는 ❓ (힌트)
-      const parts = recipe.ingredients.map((id, k) => {
-        const chef = chefById(id);
-        if (have[k]) return `✅${chef.emoji}`;
-        return known ? `⬜${chef.emoji}` : '❓';
-      });
-      c.add(scene.add.text(left + 116, y + 70, parts.join(' + '), { fontFamily: EMOJI_FONT, fontSize: '24px', color: COLORS.text }).setOrigin(0, 0.5));
-      if (known && result.ability) {
-        c.add(scene.add.text(left + PANEL_WIDTH - 175, y + 26, result.ability, { fontFamily: FONT, fontSize: '15px', color: '#b9a48f' }).setOrigin(1, 0.5));
+    let y = top + 112;
+    for (const recipe of this.fit) {
+      this.drawBig(recipe, y);
+      y += BIG_ROW;
+    }
+    if (this.other.length) {
+      c.add(scene.add.text(left + 28, y + 18, '다른 덱으로 만드는 신화', { fontFamily: FONT, fontSize: '18px', color: '#8a7a6a' }).setOrigin(0, 0.5));
+      y += 40;
+      for (const recipe of this.other) {
+        this.drawSmall(recipe, y);
+        y += SMALL_ROW;
       }
-      const unlocked = this.isUnlocked(recipe);
-      const label = !unlocked ? (recipe.grade === 'fullcourse' ? '🔒 동네 4' : '🔒 동네 2') : '만들기';
-      c.add(createButton(scene, left + PANEL_WIDTH - 95, y + 51, 140, 70, label, () => this.onCraft(recipe), { fontSize: 22, color: 0x2e8b57, enabled: ready }));
-    });
-
-    if (pages > 1) {
-      const y = top + 140 + PER_PAGE * ROW_HEIGHT + 4;
-      const arrow = (x, text, delta) => {
-        const t = scene.add.text(x, y, text, { fontFamily: FONT, fontSize: '36px', fontStyle: 'bold', color: COLORS.text }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        t.on('pointerup', () => {
-          this.page = (this.page + delta + pages) % pages;
-          sfx.click();
-          this.draw();
-        });
-        c.add(t);
-      };
-      arrow(left + 200, '◀', -1);
-      arrow(left + PANEL_WIDTH - 200, '▶', 1);
-      c.add(scene.add.text(GAME_WIDTH / 2, y, `${this.page + 1} / ${pages}`, { fontFamily: FONT, fontSize: '22px', color: '#d8c8b4' }).setOrigin(0.5));
     }
   }
 
-  // 🍱 합작 요리 안내: 다른 줄 요리를 상하좌우로 붙이면 같이 던지는 요리 (이번 덱에서 나오는 것만)
-  drawCombos() {
+  // 큰 줄: 🍔 산더미 버거 ★  [🍞 ✅] + [🍗 ⬜]  능력   [만들기]
+  drawBig(recipe, y) {
     const scene = this.scene;
-    const { left, top } = this;
-    const combos = SETS.filter((set) => set.lines.every((line) => this.deck.includes(line)));
-    this.container.add(
-      scene.add.text(left + 36, top + 110, '다른 줄 요리를 옆에 붙이면, 둘이 10번 던질 때마다 합작 요리!', { fontFamily: FONT, fontSize: '20px', color: '#d8c8b4' }),
+    const c = this.container;
+    const left = this.left;
+    const result = chefById(recipe.result);
+    const have = recipe.ingredients.map((id) => this.hasChef(id));
+    const ready = have.every(Boolean);
+    const g = scene.add.graphics();
+    g.fillStyle(ready ? 0x8a6a1a : 0x2b1d14, 1);
+    g.fillRoundedRect(left + 14, y, PANEL_WIDTH - 28, BIG_ROW - 10, 16);
+    if (ready) {
+      g.lineStyle(4, 0xffd54f, 1);
+      g.strokeRoundedRect(left + 14, y, PANEL_WIDTH - 28, BIG_ROW - 10, 16);
+    }
+    c.add(g);
+    c.add(scene.add.text(left + 58, y + 45, result.emoji, { fontFamily: EMOJI_FONT, fontSize: '46px' }).setOrigin(0.5));
+    const made = isDiscovered(result.id) ? '' : '  NEW';
+    c.add(
+      scene.add
+        .text(left + 100, y + 22, `${result.name} ${'★'.repeat(recipe.stars)}${made}`, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: ready ? '#fff3c4' : COLORS.text })
+        .setOrigin(0, 0.5),
     );
-    [...combos, LUNCHBOX].forEach((set, i) => {
-      const combo = set.lines ? set.lines.map((m) => METHODS[m].emoji).join(' + ') : '그 밖의 짝';
-      this.container.add(
-        scene.add.text(left + 36, top + 160 + i * 52, `${set.emoji} ${set.name} (${combo})  ${set.desc}`, { fontFamily: FONT, fontSize: '22px', color: COLORS.text }),
-      );
-    });
+    const parts = recipe.ingredients.map((id, k) => `[${chefById(id).emoji}${have[k] ? '✅' : '⬜'}]`).join(' + ');
+    c.add(scene.add.text(left + 100, y + 56, parts, { fontFamily: EMOJI_FONT, fontSize: '22px', color: COLORS.text }).setOrigin(0, 0.5));
+    c.add(scene.add.text(left + 100, y + 80, result.ability, { fontFamily: FONT, fontSize: '16px', color: ready ? '#fff3c4' : '#b9a48f' }).setOrigin(0, 0.5));
+    const button = createButton(scene, left + PANEL_WIDTH - 90, y + 45, 130, 66, '만들기', () => this.onCraft(recipe), { fontSize: 24, color: 0xc0392b, enabled: ready });
+    c.add(button);
+    if (ready) scene.tweens.add({ targets: button, scale: 1.08, duration: 400, yoyo: true, repeat: -1 });
+  }
+
+  // 작은 줄: 흐리게 (덱에 없는 줄의 재료)
+  drawSmall(recipe, y) {
+    const scene = this.scene;
+    const result = chefById(recipe.result);
+    const parts = recipe.ingredients.map((id) => chefById(id).emoji).join(' + ');
+    this.container.add(
+      scene.add
+        .text(this.left + 36, y + SMALL_ROW / 2, `${result.emoji} ${result.name} ${'★'.repeat(recipe.stars)}   ${parts}`, {
+          fontFamily: EMOJI_FONT,
+          fontSize: '20px',
+          color: '#8a7a6a',
+        })
+        .setOrigin(0, 0.5)
+        .setAlpha(0.7),
+    );
   }
 }
