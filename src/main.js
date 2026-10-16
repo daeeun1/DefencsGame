@@ -15,6 +15,7 @@ import { getSave, writeSave } from './save.js';
 import { journeyRun, dailyRun, eventRun } from './data/runs.js';
 import { currentEvent } from './data/events.js';
 import { autoFullscreen } from './fullscreen.js';
+import { EMOJI_FACES } from './emojiFont.js';
 
 // 도트 글꼴(갈무리)을 먼저 불러온다. 글꼴이 준비되기 전에 글씨를 그리면 다른 글꼴로 나와 버린다.
 async function loadFonts() {
@@ -27,6 +28,20 @@ async function loadFonts() {
     faces.forEach((face) => document.fonts.add(face));
   } catch (error) {
     console.warn('글꼴을 불러오지 못해서 기본 글꼴로 표시해요', error);
+  }
+  await loadEmojiFont();
+}
+
+// 🙂 게임용 이모지 글꼴: 폰의 이모지 글꼴이 오래됐거나 없어서 X로 보이는 일을 막는다.
+// 아이폰·맥은 원래 이모지(Apple Color Emoji)가 잘 나오니 그대로 둔다.
+async function loadEmojiFont() {
+  if (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)) return;
+  try {
+    const faces = EMOJI_FACES.map(({ url, range }) => new FontFace('GameEmoji', `url(${url})`, { unicodeRange: range }));
+    await Promise.all(faces.map((face) => face.load()));
+    faces.forEach((face) => document.fonts.add(face));
+  } catch (error) {
+    console.warn('이모지 글꼴을 불러오지 못해서 폰의 이모지로 표시해요', error);
   }
 }
 

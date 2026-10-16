@@ -85,3 +85,8 @@ src/
 - 랭킹은 `leaderboards/{daily_날짜 또는 endless}/scores/{계정 id}`에 계정마다 최고 점수 하나씩 저장됩니다.
 - 보안 규칙은 `firestore.rules`에 있습니다. Firebase 콘솔 → Firestore Database → 규칙에 붙여 넣고 게시하세요.
 - 인터넷이 없거나 Firebase가 준비되지 않았으면 휴대폰 저장만으로 그대로 플레이됩니다.
+
+## 🙂 이모지 글꼴
+
+폰마다 이모지 글꼴이 달라서 X로 보이는 일을 막으려고, 게임이 쓰는 이모지만 잘라 낸 Noto Color Emoji를 함께 넣었다 (`src/assets/emoji/`, `src/emojiFont.js`, 아이폰·맥은 원래 이모지).
+새 이모지를 쓰면 `pip install fonttools brotli` 후 `python3 scripts/emoji-subset.py`로 다시 만든다.
