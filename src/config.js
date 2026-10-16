@@ -19,7 +19,7 @@ export function gameLayout(screenHeight) {
   const hud = { y: 10, h: lerp(92, 120) };
   const gauge = { y: hud.y + hud.h + lerp(8, 12), h: lerp(32, 44) };
   const boardY = gauge.y + gauge.h + lerp(12, 18);
-  const info = { y: boardY + BOARD_ROWS * TILE + lerp(10, 16), h: lerp(66, 84) };
+  const info = { y: boardY + BOARD_ROWS * TILE + lerp(8, 14), h: lerp(80, 100) }; // 폰에서도 잘 읽히게 넉넉히
   const panel = { y: info.y + info.h + lerp(8, 14), h: 0 };
   panel.h = screenHeight - panel.y - 10;
 
@@ -58,4 +58,4 @@ export const FONT = '"Galmuri11", "GameEmoji", "Apple SD Gothic Neo", "Malgun Go
 // 유닛(요리) 그림으로 쓰는 이모지 글꼴.
 // 안드로이드(갤럭시 등)는 기기 기본 이모지를 쓰도록 이름을 따로 적지 않는다.
 // ("Noto Color Emoji"를 적으면 갤럭시에서 오래된 이모지 글꼴이 골라져 최신 이모지가 X로 나올 수 있다)
-export const EMOJI_FONT = '"GameEmoji", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Samsung Color Emoji", sans-serif';
+export const EMOJI_FONT = '"GameEmoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif';

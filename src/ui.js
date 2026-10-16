@@ -68,18 +68,18 @@ export function createCommandButton(scene, x, y, width, height, { emoji, label, 
   const tall = height >= 100;
   // 높은 버튼: 이모지 / 이름 / 설명을 세 줄로. 낮은 버튼: "이모지 이름"을 한 줄로, 그 아래 설명
   const emojiText = scene.add
-    .text(0, -height * 0.2, tall ? emoji : '', { fontFamily: EMOJI_FONT, fontSize: '40px' })
+    .text(0, -height * 0.24, tall ? emoji : '', { fontFamily: EMOJI_FONT, fontSize: '38px' })
     .setOrigin(0.5);
   const labelText = scene.add
-    .text(0, tall ? height * 0.12 : -height * 0.17, '', {
+    .text(0, tall ? height * 0.07 : -height * 0.17, '', {
       fontFamily: FONT,
-      fontSize: tall ? '24px' : '20px',
+      fontSize: tall ? '30px' : '26px',
       fontStyle: 'bold',
       color: COLORS.text,
     })
     .setOrigin(0.5);
   const subText = scene.add
-    .text(0, tall ? height * 0.32 : height * 0.22, '', { fontFamily: FONT, fontSize: '18px', color: COLORS.text })
+    .text(0, tall ? height * 0.3 : height * 0.22, '', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#fff3c4' })
     .setOrigin(0.5);
   // 글자가 버튼보다 넓으면 작게 줄인다
   const fit = (text, size) => {
@@ -88,7 +88,7 @@ export function createCommandButton(scene, x, y, width, height, { emoji, label, 
   };
   const showLabel = (value) => {
     labelText.setText(tall ? value : `${emoji} ${value}`);
-    fit(labelText, tall ? 24 : 20);
+    fit(labelText, tall ? 30 : 26);
   };
   showLabel(label);
 
@@ -130,7 +130,7 @@ export function createCommandButton(scene, x, y, width, height, { emoji, label, 
   button.setSub = (value) => {
     if (subText.text !== value) {
       subText.setText(value);
-      fit(subText, 18);
+      fit(subText, tall ? 24 : 22);
     }
     return button;
   };

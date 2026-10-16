@@ -1423,23 +1423,25 @@ export default class GameScene extends Phaser.Scene {
     this.swapButton.setVisible(showing && this.features.swap); // 🔀 W31부터
     if (!chef) {
       if (this.lastLog) this.logText.setText(this.lastLog.message).setColor(this.lastLog.color);
+      this.fitLog();
       return;
     }
 
     const s = chef.stats;
     const method = METHODS[s.method];
     info.emoji.setText(s.emoji);
-    const line = LINES.includes(s.method) ? ` · ${method.emoji} ${method.name} 줄` : '';
-    info.title.setText(`${s.name}${line}`);
     const rank = rankOf(s);
+    const line = LINES.includes(s.method) ? ` ${method.emoji}` : '';
+    info.title.setText(`${rank.name} ${s.name}${line}`);
     info.title.setColor(colorToHex(rank.color === 0xb8b8b8 ? 0xfff8ec : rank.color));
 
-    const parts = [rank.name];
+    // 짧게: 요리 양 · 던지는 시간 · 좋아하는 손님 · 능력
+    const parts = [];
     if (s.method === 'buff') {
-      parts.push(`옆 칼질 속도 +${Math.round(s.buff.attackSpeed * 100)}%`);
+      parts.push(`옆 칼질 +${Math.round(s.buff.attackSpeed * 100)}%`);
     } else {
-      parts.push(`요리 양 ${Math.round(s.damage * this.powerMultiplier(s))}`);
-      parts.push(`🔪${chef.chops}번 ${(s.interval / chef.attackSpeed).toFixed(1)}초`);
+      parts.push(`양 ${Math.round(s.damage * this.powerMultiplier(s))}`);
+      parts.push(`${(s.interval / chef.attackSpeed).toFixed(1)}초`);
       if (s.method === 'all') parts.push('모두 좋아함');
       else {
         const fans = Object.entries(MONSTERS)
@@ -1450,12 +1452,16 @@ export default class GameScene extends Phaser.Scene {
     }
     if (s.ability) parts.push(s.ability);
     info.detail.setText(parts.join(' · '));
-    // 판매 버튼과 겹치지 않게 너무 길면 줄인다
-    const maxWidth = GAME_WIDTH - 104 - 80 - 96 - 10 - 130; // 판매·바꾸기 버튼과 겹치지 않게
-    info.detail.setFontSize(18);
-    if (info.detail.width > maxWidth) info.detail.setFontSize(Math.floor((18 * maxWidth) / info.detail.width));
-    info.title.setFontSize(24);
-    if (info.title.width > maxWidth) info.title.setFontSize(Math.floor((24 * maxWidth) / info.title.width));
+    // 판매·바꾸기 버튼과 겹치지 않게 너무 길면 줄인다 (버튼이 안 열렸으면 넓게 쓴다)
+    const buttons = [this.sellButton, this.swapButton].filter((b) => b.visible);
+    const right = buttons.length ? Math.min(...buttons.map((b) => b.x - b.width / 2)) - 12 : GAME_WIDTH - 32;
+    const maxWidth = right - 96;
+    const fit = (text, size, min) => {
+      text.setFontSize(size);
+      if (text.width > maxWidth) text.setFontSize(Math.max(min, Math.floor((size * maxWidth) / text.width)));
+    };
+    fit(info.title, 28, 20);
+    fit(info.detail, 22, 17);
     this.updateHud();
   }
 
@@ -2221,28 +2227,28 @@ export default class GameScene extends Phaser.Scene {
     infoBox.fillStyle(COLORS.outline, 0.9);
     infoBox.fillRoundedRect(12, info.y, GAME_WIDTH - 24, info.h, 14);
     const cy = info.y + info.h / 2;
-    const small = info.h < 76;
+    // 폰에서는 화면이 절반쯤으로 줄어 보이므로 글씨를 크게 (28px → 폰에서 약 15px)
     this.logText = this.add
-      .text(32, cy, '', { fontFamily: FONT, fontSize: small ? '21px' : '24px', color: COLORS.text, wordWrap: { width: GAME_WIDTH - 64 } })
+      .text(32, cy, '', { fontFamily: FONT, fontSize: '28px', color: COLORS.text, wordWrap: { width: GAME_WIDTH - 64 }, lineSpacing: 2 })
       .setOrigin(0, 0.5);
     this.info = {
       emoji: this.add.text(54, cy, '', { fontFamily: EMOJI_FONT, fontSize: `${Math.round(info.h * 0.62)}px` }).setOrigin(0.5),
       title: this.add
-        .text(96, cy - info.h * 0.2, '', { fontFamily: FONT, fontSize: small ? '21px' : '24px', fontStyle: 'bold', color: COLORS.text })
+        .text(96, cy - info.h * 0.22, '', { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: COLORS.text })
         .setOrigin(0, 0.5),
       detail: this.add
-        .text(96, cy + info.h * 0.22, '', { fontFamily: FONT, fontSize: small ? '16px' : '18px', color: '#b9c2cf' })
+        .text(96, cy + info.h * 0.2, '', { fontFamily: FONT, fontSize: '22px', color: '#d6dde8' })
         .setOrigin(0, 0.5),
     };
-    this.sellButton = createButton(this, GAME_WIDTH - 92, cy, 140, info.h - 16, '', () => this.sellSelected(), {
-      fontSize: 22,
+    this.sellButton = createButton(this, GAME_WIDTH - 24 - 60, cy, 120, info.h - 16, '', () => this.sellSelected(), {
+      fontSize: 24,
       color: 0xc99a2e,
     });
-    this.swapButton = createButton(this, GAME_WIDTH - 92 - 136, cy, 124, info.h - 16, '', () => this.swapSelected(), {
-      fontSize: 22,
+    this.swapButton = createButton(this, GAME_WIDTH - 24 - 120 - 8 - 55, cy, 110, info.h - 16, '', () => this.swapSelected(), {
+      fontSize: 24,
       color: 0x8e4fc0,
     });
-    this.log('💬 같은 요리끼리 겹치면 합치기, 톡 누르면 칼질 돕기, 🔀로 다른 줄로 바꾸기!', '#b9a48f');
+    this.log('💬 같은 요리를 겹치면 합치기, 톡 누르면 칼질 돕기!', '#b9a48f');
 
     // 큰 명령 버튼 3개: 뽑기(크게) / 자동 합치기 / 강화
     const gap = 12;
@@ -2286,11 +2292,21 @@ export default class GameScene extends Phaser.Scene {
     this.selectChef(null);
   }
 
+  // 알림 글씨가 정보 줄(두 줄까지)에 들어가게: 넘치면 조금씩 줄인다
+  fitLog() {
+    const maxHeight = this.layout.info.h - 8;
+    for (let size = 28; size >= 20; size -= 2) {
+      this.logText.setFontSize(size);
+      if (this.logText.height <= maxHeight) return;
+    }
+  }
+
   // 알림 바꾸기 (유닛을 고르고 있는 동안에는 기억만 해 두었다가, 선택을 풀면 보여 준다)
   log(message, color = COLORS.text) {
     this.lastLog = { message, color };
     if (!this.logText || this.selectedChef) return;
     this.logText.setText(message).setColor(color);
+    this.fitLog();
     this.logText.setAlpha(0.4);
     this.tweens.add({ targets: this.logText, alpha: 1, duration: 200 });
   }
